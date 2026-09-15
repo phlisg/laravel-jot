@@ -1,0 +1,12 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - config
+    tmpDir: build/phpstan
+    # Larastan only allows env() in the app's config directory by default.
+    configDirectories:
+        - %currentWorkingDirectory%/config
