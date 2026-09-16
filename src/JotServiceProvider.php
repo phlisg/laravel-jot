@@ -14,5 +14,7 @@ class JotServiceProvider extends PackageServiceProvider
             ->name('jot')
             ->hasConfigFile()
             ->hasInstallCommand(fn (InstallCommand $command) => $command->publishConfigFile());
+
+        $this->app->scoped(Jot::class);
     }
 }
