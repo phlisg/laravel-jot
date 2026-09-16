@@ -8,7 +8,8 @@ use Phlisg\Jot\Attributes\Hide;
 use ReflectionObject;
 use ReflectionProperty;
 
-trait Utils {
+trait Utils
+{
     /**
      * Flattening rules live in the README, see "Base class".
      */

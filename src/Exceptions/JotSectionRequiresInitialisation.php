@@ -3,11 +3,12 @@
 namespace Phlisg\Jot\Exceptions;
 
 use LogicException;
+use Phlisg\Jot\Section;
 
 class JotSectionRequiresInitialisation extends LogicException
 {
     /**
-     * @param  class-string<\Phlisg\Jot\Section>  $section
+     * @param  class-string<Section>  $section
      */
     public static function for(string $section): self
     {

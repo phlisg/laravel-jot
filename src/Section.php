@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 abstract class Section
 {
     use Utils;
+
     /**
      * Defines an automatic prefix from class name. You may override it using $prefix
      * */
@@ -19,8 +20,8 @@ abstract class Section
         }
 
         return $prefixes[static::class] ??= Str::snake(
-            str_replace(["Log", "Section"], "",
-                mb_substr(mb_strrchr('\\' . static::class, '\\'), 1))
+            str_replace(['Log', 'Section'], '',
+                mb_substr(mb_strrchr('\\'.static::class, '\\'), 1))
         );
     }
 

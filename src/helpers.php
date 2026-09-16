@@ -11,12 +11,12 @@ if (! function_exists('jot')) {
 
         if ($section) {
             if (! is_subclass_of($section, Section::class)) {
-                throw new InvalidArgumentException('Section must be a subclass of ' . Section::class);
+                throw new InvalidArgumentException('Section must be a subclass of '.Section::class);
             }
 
             try {
                 return $jot->getSection($section);
-            } catch(InvalidArgumentException $e) {
+            } catch (InvalidArgumentException $e) {
                 throw new JotSectionRequiresInitialisation($section, $e);
             }
         }

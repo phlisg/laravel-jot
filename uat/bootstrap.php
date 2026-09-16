@@ -1,7 +1,6 @@
 <?php
 
 use Orchestra\Testbench\Foundation\Application;
-use Phlisg\Jot\Jot;
 use Phlisg\Jot\JotServiceProvider;
 
 require __DIR__.'/../vendor/autoload.php';

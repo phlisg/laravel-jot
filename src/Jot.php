@@ -8,10 +8,12 @@ use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
 use ReflectionClass;
 use ReflectionException;
 
-class Jot {
+class Jot
+{
     use Utils;
 
     protected array $sections = [];
+
     protected array $fields = []; // The resolved fields with their values, flattened at emit-time
 
     final public function getSection(Section|string $section): ?Section
@@ -119,40 +121,40 @@ class Jot {
      * @throws InvalidArgumentException
      * @throws ReflectionException
      */
-    protected function appendSection(Section|string $section) : void
-   {
-       if (! is_subclass_of($section, Section::class)) {
-           throw new InvalidArgumentException('Section must be a subclass of '.Section::class);
-       }
+    protected function appendSection(Section|string $section): void
+    {
+        if (! is_subclass_of($section, Section::class)) {
+            throw new InvalidArgumentException('Section must be a subclass of '.Section::class);
+        }
 
-       if (! is_string($section)) {
-           $this->sections[$section::prefix()] = $section;
+        if (! is_string($section)) {
+            $this->sections[$section::prefix()] = $section;
 
-           return;
-       }
+            return;
+        }
 
-       if (isset($this->sections[$section::prefix()])) {
-           return;
-       }
+        if (isset($this->sections[$section::prefix()])) {
+            return;
+        }
 
-       if ((new ReflectionClass($section))->getConstructor()?->getNumberOfRequiredParameters()) {
-           throw JotSectionRequiresInitialisation::for($section);
-       }
+        if ((new ReflectionClass($section))->getConstructor()?->getNumberOfRequiredParameters()) {
+            throw JotSectionRequiresInitialisation::for($section);
+        }
 
-       $this->sections[$section::prefix()] = new $section;
-   }
+        $this->sections[$section::prefix()] = new $section;
+    }
 
-   protected function appendKey(string $key, mixed $value = null) : void
-   {
-       if (isset($this->fields[$key])) {
-           $currentKey = gettype($this->fields[$key]);
-           $message = "[jot] Key '{$key}' already exists as $currentKey and will be overwritten.";
-           logger()->warning($message);
-           if (app()->runningInConsole()) {
-               echo $message . PHP_EOL;
-           }
-       }
+    protected function appendKey(string $key, mixed $value = null): void
+    {
+        if (isset($this->fields[$key])) {
+            $currentKey = gettype($this->fields[$key]);
+            $message = "[jot] Key '{$key}' already exists as $currentKey and will be overwritten.";
+            logger()->warning($message);
+            if (app()->runningInConsole()) {
+                echo $message.PHP_EOL;
+            }
+        }
 
-       $this->fields[$key] = $value;
-   }
+        $this->fields[$key] = $value;
+    }
 }
