@@ -1,4 +1,4 @@
-# Laravel Jot
+jk# Laravel Jot
 
 Laravel Jot writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
 
@@ -168,7 +168,8 @@ jot()->add(new StripePayment(
 ```
 
 - Adding a second instance of the same class replaces the first.
-- `jot(StripePayment::class)` returns the added instance. For a class with required constructor arguments, it returns `null` when no instance was added yet, so add such sections with `jot()->add(new ...)`.
+- `jot(StripePayment::class)` returns the added instance, and creates it on first call when the class has no required constructor arguments.
+- A class with required constructor arguments cannot be created by the package, so `jot(StripePayment::class)` throws until the instance is added with `jot()->add(new ...)`. The exception names the class and the call to make. It fires the first time the code runs, which keeps the collection path free of silent `null` returns.
 
 ### Base class
 
