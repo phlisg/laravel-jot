@@ -1,0 +1,12 @@
+#!/bin/sh
+# Usage: ./dev <command...>   in the php container
+#   ./dev pest --filter=Section      (pest, phpstan, pint and composer are shortcuts)
+#   ./dev php -v
+set -e
+cd "$(dirname "$0")"
+
+case "$1" in
+    pest|phpstan|pint) set -- "vendor/bin/$@" ;;
+esac
+
+exec docker compose run --rm php "$@"
