@@ -1,8 +1,6 @@
-jk# Laravel Jot
+# Laravel Jot
 
 Laravel Jot writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
-
-> Status: specification. Nothing is implemented yet.
 
 ## Why
 
