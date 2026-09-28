@@ -25,13 +25,49 @@ Runs one command in the PHP container, from the repository root.
 `uat/` holds scripts that boot the package outside the test suite, through Testbench, and dump what the code does. They are for behavior that is still being designed, when a wall of dumps says more than an assertion.
 
 ```sh
-uat/run section.php     # one script
+uat/run section         # one script, with or without the .php
+uat/run section.php
 uat/run                 # every script in uat/, bootstrap.php excluded
 ```
 
 Each script requires `uat/bootstrap.php`, which creates the Testbench application with `JotServiceProvider` registered. The runner passes `-d zend.assertions=1`, so `assert()` inside a script stops it with an `AssertionError`.
 
 A script covers one theme, and the file name says which: `section.php`, `add.php`.
+
+### wrap()
+
+`uat/bootstrap.php` defines `wrap()`, which labels one step, runs it, then dumps what the accumulator holds: `fields` raw, `sections` flattened the way emit will write them, and `logs`, every log line the step wrote, such as a jot warning.
+
+```php
+wrap('a string key', fn () => jot()->add('payment.provider', 'stripe'));
+
+wrap('increment, twice', function () {
+    jot()->increment('payment.attempts');
+    jot()->increment('payment.attempts');
+});
+
+wrap('a section fills over the request', function () {
+    jot(PaymentLog::class)->attempts++;
+    jot(PaymentLog::class)->status = 'declined';
+});
+
+wrap('where we are');   // no step: a snapshot on its own
+```
+
+Output for the first one:
+
+```
+--- a string key
+array:2 [
+  "fields" => array:1 [
+    "payment.provider" => "stripe"
+  ]
+  "sections" => []
+  "logs" => []
+]
+```
+
+The accumulator lives for the whole script, so each `wrap()` shows every field written so far, not only the ones from its own step. `logs` is the exception: it holds only what the current step logged.
 
 Two files are committed, the harness: `uat/run` and `uat/bootstrap.php`. The scripts themselves are git-ignored, because they go stale as soon as the behavior they explore settles.
 
