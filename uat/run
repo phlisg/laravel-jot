@@ -1,11 +1,13 @@
 #!/bin/sh
-# Usage: uat/run [script ...]   (no argument runs every uat/*.php script)
+# Usage: uat/run [script ...]   section and section.php both work
+#        uat/run             runs every uat/*.php script
 set -e
 cd "$(dirname "$0")/.."
 
 [ $# -eq 0 ] && set -- $(ls uat/*.php | grep -v bootstrap.php | xargs -n1 basename)
 
 for script in "$@"; do
+    script="${script%.php}"
     echo "=== $script"
-    docker compose run --rm php php -d zend.assertions=1 "uat/$script"
+    docker compose run --rm php php -d zend.assertions=1 "uat/$script.php"
 done
