@@ -8,11 +8,14 @@ use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
 use ReflectionClass;
 use ReflectionException;
 
-class Jot {
+class Jot
+{
     use Utils;
 
     protected array $sections = [];
+
     protected array $fields = []; // The resolved fields with their values, flattened at emit-time
+
     protected array $owners = []; // field => 'a string key', 'an enum key' or a section class
 
     final public function getSection(Section|string $section): ?Section
@@ -140,44 +143,44 @@ class Jot {
      * @throws InvalidArgumentException
      * @throws ReflectionException
      */
-    protected function appendSection(Section|string $section) : void
-   {
-       if (! is_subclass_of($section, Section::class)) {
-           throw new InvalidArgumentException('Section must be a subclass of '.Section::class);
-       }
+    protected function appendSection(Section|string $section): void
+    {
+        if (! is_subclass_of($section, Section::class)) {
+            throw new InvalidArgumentException('Section must be a subclass of '.Section::class);
+        }
 
-       if (! is_string($section)) {
-           $this->sections[$section::prefix()] = $section;
+        if (! is_string($section)) {
+            $this->sections[$section::prefix()] = $section;
 
-           return;
-       }
+            return;
+        }
 
-       if (isset($this->sections[$section::prefix()])) {
-           return;
-       }
+        if (isset($this->sections[$section::prefix()])) {
+            return;
+        }
 
-       if ((new ReflectionClass($section))->getConstructor()?->getNumberOfRequiredParameters()) {
-           throw JotSectionRequiresInitialisation::for($section);
-       }
+        if ((new ReflectionClass($section))->getConstructor()?->getNumberOfRequiredParameters()) {
+            throw JotSectionRequiresInitialisation::for($section);
+        }
 
-       $this->sections[$section::prefix()] = new $section;
-   }
+        $this->sections[$section::prefix()] = new $section;
+    }
 
-   protected function appendKey(string $field, mixed $value, string $owner): void
-   {
-       $previous = $this->owners[$field] ?? null;
+    protected function appendKey(string $field, mixed $value, string $owner): void
+    {
+        $previous = $this->owners[$field] ?? null;
 
-       // See "Key collisions" in the README. Section keys get their owner at emit.
-       if ($previous !== null && $previous !== $owner) {
-           logger()->warning(sprintf(
-               '[jot] Key "%s" was already added by %s, then overwritten by %s.',
-               $field,
-               $previous,
-               $owner,
-           ));
-       }
+        // See "Key collisions" in the README. Section keys get their owner at emit.
+        if ($previous !== null && $previous !== $owner) {
+            logger()->warning(sprintf(
+                '[jot] Key "%s" was already added by %s, then overwritten by %s.',
+                $field,
+                $previous,
+                $owner,
+            ));
+        }
 
-       $this->fields[$field] = $value;
-       $this->owners[$field] = $owner;
-   }
+        $this->fields[$field] = $value;
+        $this->owners[$field] = $owner;
+    }
 }
