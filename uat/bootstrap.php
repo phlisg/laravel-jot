@@ -28,9 +28,22 @@ function wrap(string $label, ?callable $step = null): void
     $step && $step();
 
     dump((fn () => [
+        'reserved' => $this->reserved,
         'fields' => $this->fields,
         'sections' => array_map(fn ($section) => $section->toDotNotation(), $this->sections),
-    ])->call(jot()) + ['logs' => $logged]);
+    ])->call(jot()) + ['event' => wrapEvent(), 'logs' => $logged]);
+}
+
+/**
+ * The final event, or the error that stopped it, so one broken step still shows the rest.
+ */
+function wrapEvent(): array|string
+{
+    try {
+        return jot()->event();
+    } catch (Throwable $e) {
+        return $e::class.': '.$e->getMessage().' at '.basename($e->getFile()).':'.$e->getLine();
+    }
 }
 
 $app = Application::create(options: ['extra' => ['providers' => [JotServiceProvider::class]]]);
