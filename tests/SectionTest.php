@@ -3,6 +3,7 @@
 namespace Phlisg\Jot\Tests;
 
 use Phlisg\Jot\Attributes\Hide;
+use Phlisg\Jot\Attributes\Key;
 use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
 use Phlisg\Jot\Section;
 
@@ -50,6 +51,14 @@ final class Checkout extends Section
     public string $cardToken = 'tok_secret';
 
     protected string $internal = 'not exported';
+}
+
+final class Route extends Section
+{
+    #[Key('url.path')]
+    public string $path = '/checkout';
+
+    public string $name = 'checkout.store';
 }
 
 final class Coupon extends Section
@@ -171,6 +180,13 @@ describe('flattening', function () {
 
     it('exports public properties only, minus the ones marked Hide', function () {
         expect((new Checkout)->toDotNotation())->toBe(['checkout.step' => 'review']);
+    });
+
+    it('writes a property marked Key under that exact key, with no prefix', function () {
+        expect((new Route)->toDotNotation())->toBe([
+            'url.path' => '/checkout',
+            'route.name' => 'checkout.store',
+        ]);
     });
 
     it('keeps a list as one value', function () {

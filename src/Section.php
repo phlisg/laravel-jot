@@ -34,6 +34,6 @@ abstract class Section
 
     final public function toDotNotation(): array
     {
-        return static::walkArrayToDot(static::getExportableProperties($this), static::prefix());
+        return static::flattenSection($this, static::prefix());
     }
 }

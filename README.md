@@ -144,10 +144,36 @@ The emitted event contains:
 
 Flattening rules:
 
+- Exported properties: public ones only. Protected and private properties stay out of the event.
 - Keys: the prefix, a dot, then the property name in snake case. `latencyMs` becomes `payment.latency_ms`.
 - Backed enums: written as their backing value.
 - `null` properties: skipped.
+- Lists: written as one value. `['intent_created', 'charged']` stays a list under one key.
 - Nested `Section` properties: flattened into deeper keys, for example `cart.coupon.code`.
+
+Two attributes change the rules for one property:
+
+- `#[Hide]`: keeps a public property out of the event, for a value the code needs but the log must not hold, such as a card token.
+- `#[Key('url.path')]`: writes the property under that exact key, with no section prefix. Use it for OpenTelemetry names, which rarely match a prefix and a property name.
+
+```php
+use OpenTelemetry\SemConv\Attributes\UrlAttributes;
+use Phlisg\Jot\Attributes\Hide;
+use Phlisg\Jot\Attributes\Key;
+
+final class CheckoutLog extends Section
+{
+    #[Key(UrlAttributes::URL_PATH)]
+    public ?string $path = null;          // written as url.path
+
+    #[Hide]
+    public ?string $cardToken = null;     // never written
+
+    public ?string $step = null;          // written as checkout.step
+}
+```
+
+> The `open-telemetry/sem-conv` package, a dependency of Jot, holds every OpenTelemetry name as a constant. A typo in a constant fails in PHP, a typo in a string key goes to the log.
 
 ### Where sections live
 
