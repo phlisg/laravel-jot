@@ -3,8 +3,14 @@
 namespace Phlisg\Jot;
 
 use BackedEnum;
+use Illuminate\Http\Request;
 use InvalidArgumentException;
 use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
+use Phlisg\Jot\Sections\AppSection;
+use Phlisg\Jot\Sections\ClientSection;
+use Phlisg\Jot\Sections\HttpSection;
+use Phlisg\Jot\Sections\QuerySection;
+use Phlisg\Jot\Sections\RequestSection;
 use ReflectionClass;
 use ReflectionException;
 
@@ -16,7 +22,61 @@ class Jot
 
     protected array $fields = []; // The resolved fields with their values, flattened at emit-time
 
-    protected array $owners = []; // field => 'a string key', 'an enum key' or a section class
+    protected array $owners = []; // field => 'string', 'enum' or a section class
+
+    protected array $reserved = []; // Built-in sections.
+
+    /**
+     * Builds the sections known when a request starts, one per group switched
+     * on in config/jot.php. The end-of-request groups come at terminate.
+     */
+    public function initialize(Request $request): static
+    {
+        $this->reserved = array_values(array_filter([
+            new RequestSection($request),
+            config('jot.fields.http', true) ? new HttpSection($request) : null,
+            config('jot.fields.client') ? new ClientSection($request) : null,
+            config('jot.fields.query.allow') ? new QuerySection($request) : null,
+            config('jot.fields.app', true) ? new AppSection : null,
+        ]));
+
+        return $this;
+    }
+
+    /**
+     * The final flat event. Pure: safe to call any number of times.
+     */
+    public function event(): array
+    {
+        return $this->build()[0];
+    }
+
+    /**
+     * Builds the event and logs its collisions. Writing to the outputs comes next.
+     */
+    public function emit(): array
+    {
+        [$event, $collisions] = $this->build();
+
+        foreach ($collisions as [$field, $first, $then]) {
+            logger()->warning(sprintf(
+                '[jot] Key "%s" was already added by %s, then overwritten by %s.',
+                $field,
+                $first,
+                $then,
+            ));
+        }
+
+        return $event;
+    }
+
+    /**
+     * "Cute" alias to `emit()`
+     * */
+    public function down(): array
+    {
+        return $this->emit();
+    }
 
     final public function getSection(Section|string $section): ?Section
     {
@@ -168,6 +228,26 @@ class Jot
 
     protected function appendKey(string $field, mixed $value, string $owner): void
     {
+        // Sections have no keyed form: the prefix comes from the class.
+        if ($value instanceof Section) {
+            if ($field !== $value::prefix()) {
+                logger()->warning(sprintf(
+                    '[jot] Section %s was added under key "%s"; it writes under its own prefix "%s".',
+                    $value::class,
+                    $field,
+                    $value::prefix(),
+                ));
+            }
+
+            $this->appendSection($value);
+
+            return;
+        }
+
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
         $previous = $this->owners[$field] ?? null;
 
         // See "Key collisions" in the README. Section keys get their owner at emit.
@@ -182,5 +262,91 @@ class Jot
 
         $this->fields[$field] = $value;
         $this->owners[$field] = $owner;
+    }
+
+    /**
+     * Fields first, then each section flattened on top, then the reserved keys.
+     * A section key that lands on a field is a collision: the section wins.
+     *
+     * @return array{array<string, mixed>, list<array{string, string, string}>}
+     */
+    protected function build(): array
+    {
+        $reserved = [];
+
+        foreach ($this->reserved as $section) {
+            $reserved = array_merge($reserved, $section->toDotNotation());
+        }
+
+        $event = $this->fields;
+        $collisions = [];
+
+        foreach ($this->sections as $section) {
+            foreach ($section->toDotNotation() as $field => $value) {
+                if (array_key_exists($field, $event)) {
+                    $collisions[] = [$field, $this->owners[$field] ?? 'a field', $section::class];
+                }
+
+                $event[$field] = $value;
+            }
+        }
+
+        foreach (array_keys(array_intersect_key($event, $reserved)) as $field) {
+            $collisions[] = [$field, $this->owners[$field] ?? 'a section', 'Jot'];
+        }
+
+        // A value and child keys under one name: nested output cannot hold both, so the value goes.
+        foreach ($this->parents(array_keys($reserved + $event)) as $parent) {
+            if (array_key_exists($parent, $event)) {
+                $collisions[] = [$parent, $this->owners[$parent] ?? 'a field', 'its child keys'];
+                unset($event[$parent]);
+            }
+        }
+
+        // `+` puts the reserved keys first and keeps their values on a duplicate key.
+        return [$this->grouped($reserved) + $this->grouped($event), $collisions];
+    }
+
+    /**
+     * Keys sharing a first segment side by side, each group where its first key
+     * appeared: payment.a, booking.x, payment.b gives payment.a, payment.b, booking.x.
+     */
+    protected function grouped(array $event): array
+    {
+        $groups = [];
+
+        foreach ($event as $key => $value) {
+            $groups[explode('.', (string) $key)[0]][$key] = $value;
+        }
+
+        $ordered = [];
+
+        foreach ($groups as $group) {
+            $ordered += $group;
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * Every ancestor of the given dotted keys: payment.card.last4 gives payment and payment.card.
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    protected function parents(array $keys): array
+    {
+        $parents = [];
+
+        foreach ($keys as $key) {
+            $segments = explode('.', $key);
+
+            while (count($segments) > 1) {
+                array_pop($segments);
+                $parents[implode('.', $segments)] = true;
+            }
+        }
+
+        return array_keys($parents);
     }
 }

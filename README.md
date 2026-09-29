@@ -227,8 +227,6 @@ On a collision, the package keeps the last write and logs a warning on the app's
 [jot] Key "payment.provider" was already added by App\Jot\StripePayment, then overwritten by a string key.
 ```
 
-The event also lists the colliding keys in `jot.collisions`, so one log query finds every request with a collision.
-
 ## Loose fields
 
 A one-off field with no section uses `add` with a string or a backed enum key:

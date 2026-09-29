@@ -106,3 +106,11 @@ describe('push', function () {
 it('starts each request with no fields', function () {
     expect(fields())->toBe([]);
 });
+
+it('groups keys by first segment, in order of first appearance', function () {
+    jot()->add('payment.provider', 'stripe')
+        ->add('booking.event_id', 42)
+        ->add('payment.status', 'declined');
+
+    expect(array_keys(jot()->event()))->toBe(['payment.provider', 'payment.status', 'booking.event_id']);
+});
