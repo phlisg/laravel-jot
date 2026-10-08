@@ -2,10 +2,13 @@
 
 namespace Phlisg\Jot;
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Exceptions\Handler;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Throwable;
 
 class JotServiceProvider extends PackageServiceProvider
 {
@@ -15,20 +18,23 @@ class JotServiceProvider extends PackageServiceProvider
             ->name('jot')
             ->hasConfigFile()
             ->hasInstallCommand(fn (InstallCommand $command) => $command->publishConfigFile());
-
-        $this->app->scoped(Jot::class);
     }
 
     public function packageRegistered(): void
     {
-        // Register the middleware
-        $this->app->singleton(Middleware\Jot::class);
+        $this->app->scoped(Jot::class);
+        $this->app->singleton(Writer::class);
+        $this->app->scoped(Middleware\JotRequest::class);
     }
 
     public function packageBooted(): void
     {
-        // Append the middleware to the kernel
-        $kernel = $this->app->make(Kernel::class);
-        $kernel->pushMiddleware(Jot::class);
+        $this->app->make(Kernel::class)->pushMiddleware(Middleware\JotRequest::class);
+
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            if ($handler instanceof Handler) {
+                $handler->reportable(fn (Throwable $e) => jot()->error($e));
+            }
+        });
     }
 }

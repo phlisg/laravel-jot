@@ -3,16 +3,25 @@
 namespace Phlisg\Jot;
 
 use BackedEnum;
+use Closure;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
 use InvalidArgumentException;
 use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
 use Phlisg\Jot\Sections\AppSection;
 use Phlisg\Jot\Sections\ClientSection;
+use Phlisg\Jot\Sections\ErrorSection;
 use Phlisg\Jot\Sections\HttpSection;
+use Phlisg\Jot\Sections\PerformanceSection;
 use Phlisg\Jot\Sections\QuerySection;
 use Phlisg\Jot\Sections\RequestSection;
+use Phlisg\Jot\Sections\UserSection;
+use PHPUnit\Framework\Assert;
 use ReflectionClass;
 use ReflectionException;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class Jot
 {
@@ -24,23 +33,135 @@ class Jot
 
     protected array $owners = []; // field => 'string', 'enum' or a section class
 
-    protected array $reserved = []; // Built-in sections.
+    /** @var array<class-string<Section>, Section> */
+    protected array $reserved = []; // Built-in sections, keyed by class.
+
+    protected ?int $startedAt = null; // hrtime, in nanoseconds
 
     /**
-     * Builds the sections known when a request starts, one per group switched
-     * on in config/jot.php. The end-of-request groups come at terminate.
+     * Starts an HTTP event: the sections known when a request starts, one per
+     * group switched on in config/jot.php. The end-of-request fields come in finalize().
      */
     public function initialize(Request $request): static
     {
-        $this->reserved = array_values(array_filter([
-            new RequestSection($request),
+        $user = config('jot.fields.user', true) || config('jot.fields.session', true)
+            || config('jot.fields.auth', true) || config('jot.fields.locale', true);
+
+        return $this->start(
+            RequestSection::fromRequest($request),
             config('jot.fields.http', true) ? new HttpSection($request) : null,
             config('jot.fields.client') ? new ClientSection($request) : null,
             config('jot.fields.query.allow') ? new QuerySection($request) : null,
+            $user ? new UserSection : null,
+        );
+    }
+
+    /**
+     * Starts any event. Only the IDs go to Context, see "Request lifecycle" in the README.
+     */
+    public function start(RequestSection $ids, ?Section ...$sections): static
+    {
+        $sections = [
+            $ids,
+            ...$sections,
             config('jot.fields.app', true) ? new AppSection : null,
+            config('jot.fields.performance') ? new PerformanceSection : null,
+        ];
+
+        $this->reserved = [];
+
+        foreach (array_filter($sections) as $section) {
+            $this->reserved[$section::class] = $section;
+        }
+
+        $this->startedAt = hrtime(true);
+
+        Context::add(array_filter([
+            'request_id' => $ids->id,
+            'trace_id' => $ids->traceId,
+            'origin' => $ids->origin,
         ]));
 
         return $this;
+    }
+
+    public function finalize(Request $request, Response $response): static
+    {
+        $this->builtIn(HttpSection::class)?->finish($request, $response);
+        $this->builtIn(UserSection::class)?->finish($request);
+
+        $resolver = app(Writer::class)->user;
+
+        if ($resolver && config('jot.fields.user', true) && $user = $request->user()) {
+            foreach ($resolver($user) as $field => $value) {
+                $this->appendKey($field, $value, 'Jot::user()');
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @template T of Section
+     *
+     * @param  class-string<T>  $class
+     * @return T|null
+     */
+    public function builtIn(string $class): ?Section
+    {
+        return $this->reserved[$class] ?? null;
+    }
+
+    public function requestId(): ?string
+    {
+        return $this->builtIn(RequestSection::class)?->id;
+    }
+
+    public function error(Throwable $e): static
+    {
+        if (config('jot.fields.errors', true)) {
+            $this->reserved[ErrorSection::class] = new ErrorSection($e);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Fields the app derives from the authenticated user, added at the end of each request.
+     *
+     * @param  Closure(Authenticatable): array<string, mixed>  $resolver
+     */
+    public function user(Closure $resolver): void
+    {
+        app(Writer::class)->user = $resolver;
+    }
+
+    /**
+     * A sampling rule: an event it returns true for is always written.
+     *
+     * @param  Closure(array<string, mixed>): bool  $rule
+     */
+    public function keepWhen(Closure $rule): void
+    {
+        app(Writer::class)->rules[] = $rule;
+    }
+
+    public function fake(): void
+    {
+        app(Writer::class)->faked = [];
+    }
+
+    /**
+     * @param  (Closure(array<string, mixed>): bool)|null  $matches
+     */
+    public function assertEmitted(?Closure $matches = null): void
+    {
+        $emitted = app(Writer::class)->faked ?? [];
+
+        Assert::assertNotEmpty(
+            $matches ? array_filter($emitted, $matches) : $emitted,
+            'No jot event was emitted'.($matches ? ' that matches the callback.' : '.'),
+        );
     }
 
     /**
@@ -52,10 +173,20 @@ class Jot
     }
 
     /**
-     * Builds the event and logs its collisions. Writing to the outputs comes next.
+     * Builds the event, logs its collisions and writes it to the outputs.
+     * An event that never started writes nothing.
      */
     public function emit(): array
     {
+        $ids = $this->builtIn(RequestSection::class);
+
+        if (! $ids) {
+            return [];
+        }
+
+        $ids->durationMs = (int) round((hrtime(true) - $this->startedAt) / 1e6);
+        $this->builtIn(PerformanceSection::class)?->finish();
+
         [$event, $collisions] = $this->build();
 
         foreach ($collisions as [$field, $first, $then]) {
@@ -66,6 +197,8 @@ class Jot
                 $then,
             ));
         }
+
+        app(Writer::class)->write($event);
 
         return $event;
     }

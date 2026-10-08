@@ -8,10 +8,10 @@ use OpenTelemetry\SemConv\Attributes\UrlAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\HttpIncubatingAttributes;
 use Phlisg\Jot\Attributes\Key;
 use Phlisg\Jot\Section;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The request half of the http group. The route, status code, response size
- * and duration are only final at the end of the request.
+ * The route, status code and response size are only final at the end of the request, see finish().
  */
 final class HttpSection extends Section
 {
@@ -22,11 +22,20 @@ final class HttpSection extends Section
     #[Key(UrlAttributes::URL_PATH)]
     public readonly string $path;
 
+    #[Key(HttpAttributes::HTTP_ROUTE)]
+    public ?string $route = null;
+
     #[Key('http.request.header.content-type')]
     public readonly ?string $contentType;
 
     #[Key(HttpIncubatingAttributes::HTTP_REQUEST_BODY_SIZE)]
     public readonly ?int $bodySize;
+
+    #[Key(HttpAttributes::HTTP_RESPONSE_STATUS_CODE)]
+    public ?int $statusCode = null;
+
+    #[Key(HttpIncubatingAttributes::HTTP_RESPONSE_BODY_SIZE)]
+    public ?int $responseSize = null;
 
     public function __construct(Request $request)
     {
@@ -34,5 +43,14 @@ final class HttpSection extends Section
         $this->path = $request->getPathInfo();
         $this->contentType = $request->header('Content-Type');
         $this->bodySize = $request->header('Content-Length') !== null ? (int) $request->header('Content-Length') : null;
+    }
+
+    public function finish(Request $request, Response $response): void
+    {
+        $this->route = $request->route()?->getName();
+        $this->statusCode = $response->getStatusCode();
+
+        $content = $response->getContent();
+        $this->responseSize = $content === false ? null : strlen($content);
     }
 }

@@ -3,6 +3,7 @@
 namespace Phlisg\Jot\Sections;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use Phlisg\Jot\Attributes\Key;
 use Phlisg\Jot\Section;
@@ -13,10 +14,13 @@ use Phlisg\Jot\Section;
 final class RequestSection extends Section
 {
     #[Key('request_id')]
-    public readonly string $id;
+    public readonly ?string $id;
 
     #[Key('trace_id')]
     public readonly string $traceId;
+
+    #[Key('parent_id')]
+    public readonly ?string $parentId;
 
     #[Key('timestamp')]
     public readonly string $timestamp;
@@ -24,15 +28,30 @@ final class RequestSection extends Section
     #[Key('entrypoint')]
     public readonly string $entrypoint;
 
-    public function __construct(Request $request)
+    #[Key('origin')]
+    public readonly string $origin;
+
+    #[Key('duration_ms')]
+    public ?int $durationMs = null;
+
+    public function __construct(string $entrypoint, ?string $id, ?string $traceId = null, ?string $parentId = null)
+    {
+        $this->id = $id;
+        $this->traceId = $traceId ?? $id ?? Str::uuid()->toString();
+        $this->parentId = $parentId;
+        $this->timestamp = now()->toIso8601String();
+        $this->entrypoint = $entrypoint;
+        $this->origin = Context::get('origin') ?? $entrypoint;
+    }
+
+    public static function fromRequest(Request $request): self
     {
         $trusted = config('jot.request_id.trust_incoming', false);
 
-        $this->id = ($trusted ? $request->header(config('jot.request_id.header', 'X-Request-Id')) : null)
+        $id = ($trusted ? $request->header(config('jot.request_id.header', 'X-Request-Id')) : null)
             ?? Str::uuid()->toString();
-        $this->traceId = ($trusted ? self::incomingTraceId($request) : null) ?? $this->id;
-        $this->timestamp = now()->toIso8601String();
-        $this->entrypoint = 'http';
+
+        return new self('http', $id, ($trusted ? self::incomingTraceId($request) : null) ?? $id);
     }
 
     /**
