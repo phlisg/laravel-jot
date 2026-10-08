@@ -50,8 +50,11 @@ class Lifecycle
         if (config('jot.queue.enabled', true)) {
             $events->listen(JobProcessing::class, $this->startJob(...));
             $events->listen(JobProcessed::class, fn (JobProcessed $e) => $this->endJob($e->job, 'processed'));
-            $events->listen(JobFailed::class, fn (JobFailed $e) => $this->endJob($e->job, 'failed'));
-            // The worker reports the exception after the job event is gone.
+            // The worker fires JobFailed before JobExceptionOccurred, the sync queue after: listen to both.
+            $events->listen(JobFailed::class, function (JobFailed $e) {
+                $this->top() === $e->job && jot()->error($e->exception);
+                $this->endJob($e->job, 'failed');
+            });
             $events->listen(JobExceptionOccurred::class, fn (JobExceptionOccurred $e) => $this->top() === $e->job && jot()->error($e->exception));
             $events->listen(JobReleasedAfterException::class, fn (JobReleasedAfterException $e) => $this->endJob($e->job, 'released'));
         }

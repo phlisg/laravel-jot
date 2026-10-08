@@ -13,6 +13,8 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Phlisg\Jot\Contracts\Retriable;
@@ -250,4 +252,16 @@ it('writes a scheduled task', function () {
         'schedule.expression' => '0 * * * *',
         'report.count' => 2,
     ]);
+});
+
+it('keeps the error of a job the worker fails', function () {
+    $job = new \Illuminate\Queue\Jobs\SyncJob(app(), json_encode([
+        'uuid' => 'job-1', 'displayName' => SyncJob::class, 'job' => 'Illuminate\Queue\CallQueuedHandler@call', 'data' => [],
+    ]), 'redis', 'default');
+
+    // Worker order: JobFailed first, then JobExceptionOccurred.
+    event(new JobProcessing('redis', $job));
+    event(new JobFailed('redis', $job, new RuntimeException('import broke')));
+
+    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class]);
 });
