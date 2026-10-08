@@ -24,12 +24,14 @@ class JotServiceProvider extends PackageServiceProvider
     {
         $this->app->scoped(Jot::class);
         $this->app->singleton(Writer::class);
+        $this->app->singleton(Lifecycle::class);
         $this->app->scoped(Middleware\JotRequest::class);
     }
 
     public function packageBooted(): void
     {
         $this->app->make(Kernel::class)->pushMiddleware(Middleware\JotRequest::class);
+        $this->app->make(Lifecycle::class)->register($this->app['events']);
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             if ($handler instanceof Handler) {
