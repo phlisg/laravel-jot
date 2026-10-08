@@ -35,6 +35,11 @@ class JotServiceProvider extends PackageServiceProvider
         $this->app->make(Lifecycle::class)->register($this->app['events']);
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            // Collision wraps the app handler in local console runs.
+            if (property_exists($handler, 'appExceptionHandler')) {
+                $handler = (fn () => $this->appExceptionHandler)->call($handler);
+            }
+
             if ($handler instanceof Handler) {
                 $handler->reportable(fn (Throwable $e) => jot()->error($e));
             }
