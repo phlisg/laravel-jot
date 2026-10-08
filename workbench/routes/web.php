@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -14,7 +13,7 @@ use Workbench\App\Jot\PaymentLog;
 
 // No CSRF (cross-site request forgery) check, so curl and jot:demo can post.
 // Laravel 13 renamed the middleware to PreventRequestForgery.
-Route::withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class])->group(function () {
+Route::withoutMiddleware([PreventRequestForgery::class])->group(function () {
     Route::get('/events/{event}', function (int $event) {
         jot()->add([
             'booking.event_id' => $event,
