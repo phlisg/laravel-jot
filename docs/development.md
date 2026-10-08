@@ -1,24 +1,49 @@
 # Development workflow
 
-Two entry points, both wrappers around `docker compose run --rm php`: `./dev` for any command in the container, `uat/run` for the exploratory scripts in `uat/`.
+PHP and Composer run in Docker, so the host needs no PHP. Two entry points wrap `docker compose run --rm php`: `./dev` for any command in the container, `uat/run` for the exploratory scripts in `uat/`.
+
+## Docker
+
+Requirements: Docker with the Compose plugin (`docker compose version` prints a version).
+
+- `Dockerfile`: FrankenPHP image for the chosen PHP version, plus Composer and the `zip` extension.
+- `compose.yaml`: one service, `php`, that mounts the package folder at `/app` and runs as your user, so created files stay yours.
+- `docker compose run --rm php <command>`: starts a throwaway container, runs the command in `/app`, then removes the container.
+
+The first run builds the image, which takes a minute. Later runs reuse it. After a change to `Dockerfile`, rebuild it: `docker compose build php`.
+
+> Your user ID is not 1000? Export it first: `export UID GID=$(id -g)`. Otherwise files in `vendor/` belong to another user.
 
 ## ./dev
 
 Runs one command in the PHP container, from the repository root.
 
 ```sh
+./dev composer install
 ./dev pest                       # the whole test suite
 ./dev pest --filter=Section      # one file or one test name
-./dev phpstan
-./dev pint
-./dev composer require --dev some/package
+./dev phpstan --memory-limit=2G  # static analysis, PHPStan with Larastan
+./dev pint                       # format the code
 ./dev php -v
 ./dev sh                         # a shell, for several commands in a row
 ```
 
 `pest`, `phpstan` and `pint` expand to `vendor/bin/<name>`. Every other argument passes through untouched.
 
-`PHP_VERSION` works as always, since compose reads it: `PHP_VERSION=8.5 ./dev pest`. See "PHP versions" in the README for the versions available and when to re-run `composer update`.
+> PHPStan's parallel workers run out of memory with the default limit. Pass `--memory-limit=2G`.
+
+## PHP versions
+
+`PHP_VERSION` picks the PHP version: `8.3` (default), `8.4` or `8.5`. Each version builds its own image, tagged `laravel-jot-php:<version>`.
+
+```sh
+PHP_VERSION=8.5 ./dev composer update
+PHP_VERSION=8.5 ./dev pest
+```
+
+> Run `composer update` after switching versions. `composer.lock` is git-ignored, and a lock resolved on one PHP version can fail on another.
+
+The GitHub Actions workflow covers PHP 8.3 to 8.5 and Laravel 11 to 13.
 
 ## uat
 
@@ -67,7 +92,7 @@ array:2 [
 ]
 ```
 
-The accumulator lives for the whole script, so each `wrap()` shows every field written so far, not only the ones from its own step. `logs` is the exception: it holds only what the current step logged.
+The accumulator lives for the whole script, so each `wrap()` shows every field written so far, by any step. `logs` is the exception: it holds only what the current step logged.
 
 Two files are committed, the harness: `uat/run` and `uat/bootstrap.php`. The scripts themselves are git-ignored, because they go stale as soon as the behavior they explore settles.
 
