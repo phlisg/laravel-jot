@@ -1,0 +1,10 @@
+<?php
+
+namespace {{ namespace }};
+
+use Phlisg\Jot\Section;
+
+final class {{ class }} extends Section
+{
+    //
+}
