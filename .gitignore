@@ -33,7 +33,3 @@ phpstan.neon
 
 # td
 .todos/
-
-# UAT scratch scripts, the harness stays
-uat/*.php
-!uat/bootstrap.php
