@@ -2,6 +2,7 @@
 # Usage: ./dev <command...>   in the php container
 #   ./dev pest --filter=Section      (pest, phpstan, pint and composer are shortcuts)
 #   ./dev php -v
+#   ./dev php vendor/bin/testbench serve --host=0.0.0.0 --port=8000   (publishes port 8000)
 set -e
 cd "$(dirname "$0")"
 
@@ -9,4 +10,10 @@ case "$1" in
     pest|phpstan|pint) set -- "vendor/bin/$@" ;;
 esac
 
-exec docker compose run --rm php "$@"
+# Ports publish only for serve, so other commands can run while it is up.
+case "$*" in
+    *testbench\ serve*) set -- --service-ports php "$@" ;;
+    *) set -- php "$@" ;;
+esac
+
+exec docker compose run --rm "$@"

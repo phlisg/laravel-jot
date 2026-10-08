@@ -8,6 +8,8 @@ services:
     image: laravel-jot-php:${PHP_VERSION:-8.3}
     user: "${UID:-1000}:${GID:-1000}"
     working_dir: /app
+    ports:
+      - "8000:8000"
     volumes:
       - .:/app
     environment:

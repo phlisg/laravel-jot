@@ -45,7 +45,8 @@
     "autoload-dev": {
         "psr-4": {
             "Phlisg\\Jot\\Tests\\": "tests/",
-            "Workbench\\App\\": "workbench/app/"
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
     },
     "scripts": {

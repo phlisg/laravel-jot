@@ -1,0 +1,19 @@
+laravel: '@testbench'
+
+providers:
+  - Phlisg\Jot\JotServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations: true
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
+workbench:
+  install: true
+  discovers:
+    web: true
+    commands: true
+  build:
+    - create-sqlite-db
+    - migrate-fresh

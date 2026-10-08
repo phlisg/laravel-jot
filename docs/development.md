@@ -1,6 +1,6 @@
 # Development workflow
 
-PHP and Composer run in Docker, so the host needs no PHP. Two entry points wrap `docker compose run --rm php`: `./dev` for any command in the container, `uat/run` for the exploratory scripts in `uat/`.
+PHP and Composer run in Docker, so the host needs no PHP. `./dev` wraps `docker compose run --rm php` and runs any command in the container.
 
 ## Docker
 
@@ -45,65 +45,78 @@ PHP_VERSION=8.5 ./dev pest
 
 The GitHub Actions workflow covers PHP 8.3 to 8.5 and Laravel 11 to 13.
 
-## uat
+## Workbench
 
-`uat/` holds scripts that boot the package outside the test suite, through Testbench, and dump what the code does. They are for behavior that is still being designed, when a wall of dumps says more than an assertion.
+The workbench is a small Laravel app, built with Orchestra Testbench Workbench, that runs the package against real requests, jobs and logins.
+
+- `testbench.yaml`: providers, route and command discovery, database build steps.
+- `workbench/routes/web.php`: one route per scenario step.
+- `workbench/app/Console/Commands/DemoCommand.php`: `jot:demo`, which runs the scenarios.
+- `workbench/app/Jot`: sections, as the README recommends for an app.
+
+### Setup
+
+Run once, and again after `composer install` or `composer update`:
 
 ```sh
-uat/run section         # one script, with or without the .php
-uat/run section.php
-uat/run                 # every script in uat/, bootstrap.php excluded
+./dev php vendor/bin/testbench workbench:build
 ```
 
-Each script requires `uat/bootstrap.php`, which creates the Testbench application with `JotServiceProvider` registered. The runner passes `-d zend.assertions=1`, so `assert()` inside a script stops it with an `AssertionError`.
+It creates an SQLite database, runs the Laravel default migrations (users, cache, jobs) and seeds the user `demo@example.com` with the password `password`.
 
-A script covers one theme, and the file name says which: `section.php`, `add.php`.
+### Scenarios
 
-### wrap()
+`jot:demo` sends each request through the HTTP kernel in the same process, so no server is needed. It prints every event the scenario wrote to the log.
 
-`uat/bootstrap.php` defines `wrap()`, which labels one step, runs it, then dumps what the accumulator holds: `fields` raw, `sections` flattened the way emit will write them, and `logs`, every log line the step wrote, such as a jot warning.
-
-```php
-wrap('a string key', fn () => jot()->add('payment.provider', 'stripe'));
-
-wrap('increment, twice', function () {
-    jot()->increment('payment.attempts');
-    jot()->increment('payment.attempts');
-});
-
-wrap('a section fills over the request', function () {
-    jot(PaymentLog::class)->attempts++;
-    jot(PaymentLog::class)->status = 'declined';
-});
-
-wrap('where we are');   // no step: a snapshot on its own
+```sh
+./dev php vendor/bin/testbench jot:demo           # list the scenarios
+./dev php vendor/bin/testbench jot:demo booking   # one scenario
+./dev php vendor/bin/testbench jot:demo all
 ```
 
-Output for the first one:
+| Scenario | What it shows |
+|---|---|
+| `booking` | The four requests of "Example: paid event booking" in the README, with a `PaymentLog` section and enums |
+| `job-failed` | A request queues a job, `queue:work --once` runs it, the job fails |
+| `job-sync` | A sync job inside a request: `parent_id` and `trace_id` point to the request |
+| `login` | `auth.result=success` and `user.id` |
+| `login-failed` | `auth.result=failed`, no `user.id` |
+| `error` | An exception, answered with a 500 |
 
+### Server
+
+1. Start the server:
+   ```sh
+   ./dev php vendor/bin/testbench serve --host=0.0.0.0 --port=8000
+   ```
+   `./dev` publishes port 8000 for this command only.
+2. Call a route from the host: `curl http://localhost:8000/events/42`.
+3. For the queued job, run a worker in another terminal: `./dev php vendor/bin/testbench queue:work`.
+4. Stop the server with Ctrl+C.
+
+### Output
+
+Events go to the default Jot output, a daily JSON file:
+
+```sh
+tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).log
 ```
---- a string key
-array:2 [
-  "fields" => array:1 [
-    "payment.provider" => "stripe"
-  ]
-  "sections" => []
-  "logs" => []
-]
-```
 
-The accumulator lives for the whole script, so each `wrap()` shows every field written so far, by any step. `logs` is the exception: it holds only what the current step logged.
+`jot:demo` prints the path at the end of each run.
 
-Two files are committed, the harness: `uat/run` and `uat/bootstrap.php`. The scripts themselves are git-ignored, because they go stale as soon as the behavior they explore settles.
+### New scenario
 
-> A behavior that stops moving belongs in `tests/`, as a Pest test. The dumps become expectations, and CI starts guarding it. `uat/` keeps only what is still open.
+1. Add the route to `workbench/routes/web.php`, with a name, since `http.route` holds the route name.
+2. Add the scenario name and description to `SCENARIOS` in `DemoCommand`.
+3. Add a `run<Name>()` method that calls `$this->send()` once per request, for example `runJobSync()` for `job-sync`.
+4. Run `./dev php vendor/bin/testbench jot:demo <name>` to check the events.
 
 ## Where a check belongs
 
 | The behavior | Where |
 |---|---|
 | Settled, and must not regress | `tests/`, a Pest test |
-| Still being designed, judged by eye | `uat/`, a script with dumps |
+| Judged by eye, on real requests and jobs | the workbench, a `jot:demo` scenario |
 | Structural rule across the package | `tests/ArchTest.php` |
 
-`tests/ArchTest.php` forbids `dd`, `dump` and `ray` in the code it scans, which is one more reason for dumps to stay in `uat/`.
+`tests/ArchTest.php` forbids `dd`, `dump` and `ray` in the code it scans.

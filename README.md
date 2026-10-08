@@ -510,4 +510,4 @@ The package follows semantic versioning and starts at `0.x`. Until `1.0.0`, a mi
 ## Contributing
 
 - `docs/architecture.md`: how the package collects and writes events, request and job lifecycle, open questions.
-- `docs/development.md`: Docker setup, tests, static analysis, PHP versions.
+- `docs/development.md`: Docker setup, tests, static analysis, PHP versions, and the workbench app that runs demo scenarios.
