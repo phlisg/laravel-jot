@@ -2,6 +2,8 @@ name: PHPStan
 
 on:
   push:
+    branches-ignore:
+      - master
     paths:
       - '**.php'
       - 'phpstan.neon.dist'

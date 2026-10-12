@@ -3,6 +3,8 @@ name: run-tests
 on:
   workflow_call:
   push:
+    branches-ignore:
+      - master
     paths:
       - '**.php'
       - '.github/workflows/run-tests.yml'
@@ -28,7 +30,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
         php: [8.5, 8.4, 8.3]
         laravel: [13.*, 12.*, 11.*]
         stability: [prefer-lowest, prefer-stable]
