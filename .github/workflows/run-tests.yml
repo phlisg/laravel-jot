@@ -2,9 +2,10 @@ name: run-tests
 
 on:
   workflow_call:
+  # Feature branches are tested through their pull request.
   push:
-    branches-ignore:
-      - master
+    branches:
+      - develop
     paths:
       - '**.php'
       - '.github/workflows/run-tests.yml'
@@ -25,24 +26,18 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       fail-fast: true
+      # The oldest supported versions with the lowest dependencies, a middle pair, and the newest.
       matrix:
-        os: [ubuntu-latest]
-        php: [8.5, 8.4, 8.3]
-        laravel: [13.*, 12.*, 11.*]
-        stability: [prefer-lowest, prefer-stable]
         include:
-          - laravel: 13.*
-            testbench: 11.*
-          - laravel: 12.*
-            testbench: 10.*
-          - laravel: 11.*
-            testbench: 9.*
+          - { php: 8.3, laravel: 11.*, testbench: 9.*, stability: prefer-lowest }
+          - { php: 8.4, laravel: 12.*, testbench: 10.*, stability: prefer-stable }
+          - { php: 8.5, laravel: 13.*, testbench: 11.*, stability: prefer-stable }
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
 
     steps:
       - name: Checkout code
