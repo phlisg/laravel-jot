@@ -129,3 +129,16 @@ it('tags Sentry issues with the trace and span IDs', function () {
         ->toMatchArray(['trace_id' => $response->headers->get('X-Request-Id')])
         ->span_id->toMatch('/^[0-9a-f]{16}$/');
 });
+
+it('shows on each Sentry issue how to find its wide event', function () {
+    config(['jot.sentry.link' => 'https://logs.example.com/?trace={trace_id}']);
+    $transport = sentry();
+    Route::get('/', fn () => \Sentry\captureMessage('boom') && 'ok');
+
+    $trace = $this->get('/')->headers->get('X-Request-Id');
+
+    expect($transport->events[0]->getContexts()['Jot'])->toMatchArray([
+        'query' => "php artisan jot:query {$trace}",
+        'link' => "https://logs.example.com/?trace={$trace}",
+    ]);
+});

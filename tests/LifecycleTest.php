@@ -235,7 +235,7 @@ it('asserts on emitted events', function () {
 });
 
 describe('output shapes', function () {
-    $event = ['timestamp' => 'now', 'trace_id' => 't1', 'service.version' => 'abc', 'http.request.method' => 'GET'];
+    $event = ['timestamp' => 'now', 'trace_id' => 't1', 'span_id' => 's1', 'service.version' => 'abc', 'http.request.method' => 'GET'];
 
     it('nests dotted keys', function () use ($event) {
         expect(OutputShape::Nested->apply($event)['http'])->toBe(['request' => ['method' => 'GET']]);
@@ -245,6 +245,7 @@ describe('output shapes', function () {
         expect(OutputShape::Otel->apply($event))->toBe([
             'Timestamp' => 'now',
             'TraceId' => 't1',
+            'SpanId' => 's1',
             'Resource' => ['service.version' => 'abc'],
             'Attributes' => ['http.request.method' => 'GET'],
         ]);

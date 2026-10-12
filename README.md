@@ -17,6 +17,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 - [Errors](#errors)
 - [Sampling](#sampling)
 - [Configuration](#configuration)
+- [Finding events](#finding-events)
 - [Sentry and GlitchTip](#sentry-and-glitchtip)
 - [Output shapes](#output-shapes)
 - [Testing](#testing)
@@ -425,6 +426,8 @@ return [
     'sentry' => [
         'enabled' => env('JOT_SENTRY', true),
         'level' => env('JOT_SENTRY_LEVEL', 'info'),
+        // Optional URL to the event in your log backend, shown on each Sentry issue. Placeholders: {trace_id}, {span_id}.
+        'link' => env('JOT_SENTRY_LINK'),
     ],
 
     'trace' => [
@@ -507,6 +510,26 @@ Settings that need a decision per app:
 - `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
 - `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%.
 
+## Finding events
+
+`jot:query` finds the events of a trace in the log files and prints them as a tree, with `parent_span_id` showing which event started which:
+
+```sh
+php artisan jot:query 4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+```
+Trace 4bf92f3577b34da6a3ce929d0e0e4736, 2 event(s)
+http  f56220033574661e  POST checkout.store 500  412ms  RuntimeException: Card declined
+└─ queue  69f6835287391bf7  ChargeCard failed  10ms  RuntimeException: Card network timeout
+```
+
+- A trace ID (32 hex characters) prints the whole trace. The `X-Request-Id` response header holds it.
+- A span ID (16 hex characters) prints the same tree, then every field of that event.
+- `--days=7`: how many days of files to read. `--json`: one JSON line per event.
+
+`jot:query` reads the outputs that write files, `single` and `daily` channels. For the other outputs, such as `stderr` or Sentry Logs, it prints where else to look.
+
 ## Sentry and GlitchTip
 
 With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works with Sentry and needs no setup:
@@ -514,7 +537,27 @@ With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works w
 - Every Sentry issue gets the tags `trace_id` and `span_id`, which point to its wide event in the logs.
 - With Sentry Logs on, each event also goes to Sentry Logs, with every field as a searchable attribute.
 
-GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs.
+GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs. Marvelous Digital's instance: https://glitchtip.marvelous.digital/.
+
+### During a failure
+
+Sentry and Jot split the work when the app throws:
+
+| | Sentry or GlitchTip | Jot |
+|---|---|---|
+| What | one issue per exception, grouped | one wide event per request, job or command |
+| Holds | stack trace, breadcrumbs, release | user, route, business fields, timings, queries, every job in the trace |
+| Created by | the SDK, when Laravel reports the exception | Jot, which adds `error.*` to the event of the unit of work |
+
+What happens:
+
+1. The SDK creates the issue. Jot creates none, since a second issue would duplicate it.
+2. Jot adds `error.type` and `exception.message` to the event. The event gets the level `error`, and sampling always keeps it.
+3. The issue carries the tags `trace_id` and `span_id`, and a "Jot" context with the command to run.
+
+From an issue to its events: run the command shown in the issue's "Jot" context, `php artisan jot:query <trace_id>`, see "Finding events" above. With a log backend, set `JOT_SENTRY_LINK` to a search URL, for example `https://grafana.example.com/explore?query={trace_id}`, and the context shows a link instead of a command to type.
+
+From a user report to the issue: the `X-Request-Id` response header holds the `trace_id`. In Sentry, search the issues for `trace_id:<id>`.
 
 To turn Sentry Logs on, set in `.env`:
 
@@ -546,7 +589,7 @@ Each entry in `outputs` pairs a log channel with a shape. The shape sets the str
 
 - `OutputShape::Flat`: one level with dotted keys, `{"http.request.method": "POST"}`. The default. Suits Datadog, Loki and most search backends.
 - `OutputShape::Nested`: dotted keys become nested arrays, `{"http": {"request": {"method": "POST"}}}`. XML formatters need this shape.
-- `OutputShape::Otel`: the OpenTelemetry (OTel) log data model. Service fields such as `service.version` go to `Resource`, the other fields go to `Attributes`, and `trace_id` goes to `TraceId`. An OpenTelemetry Collector can read a log file in this shape.
+- `OutputShape::Otel`: the OpenTelemetry (OTel) log data model. Service fields such as `service.version` go to `Resource`, the other fields go to `Attributes`, `trace_id` goes to `TraceId` and `span_id` to `SpanId`. An OpenTelemetry Collector can read a log file in this shape.
 
 > OTel marks some names as incubating, which means a later OTel release can still rename them. Jot uses these incubating names: `host.name`, `user.id`, `http.request.body.size`, `http.response.body.size` and `process.runtime.version`.
 

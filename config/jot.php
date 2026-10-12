@@ -18,6 +18,8 @@ return [
     'sentry' => [
         'enabled' => env('JOT_SENTRY', true),
         'level' => env('JOT_SENTRY_LEVEL', 'info'),
+        // Optional URL to the event in your log backend, shown on each Sentry issue. Placeholders: {trace_id}, {span_id}.
+        'link' => env('JOT_SENTRY_LINK'),
     ],
 
     'trace' => [

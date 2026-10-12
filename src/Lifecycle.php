@@ -232,6 +232,7 @@ class Lifecycle
 
         app()->instance(Jot::class, $previous);
         Context::flush()->add($context)->addHidden($hidden);
+        $previous->tagSentry();
     }
 
     protected function top(): ?object

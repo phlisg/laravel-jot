@@ -76,14 +76,31 @@ class Jot
 
         $this->startedAt = hrtime(true);
 
-        $tags = ['trace_id' => $ids->traceId, 'span_id' => $ids->spanId];
+        Context::add(['trace_id' => $ids->traceId, 'span_id' => $ids->spanId, 'origin' => $ids->origin]);
 
-        Context::add($tags + ['origin' => $ids->origin]);
+        return $this->tagSentry();
+    }
 
-        // Links each Sentry issue to its wide event.
-        if (config('jot.sentry.enabled', true) && app()->bound('sentry')) {
-            \Sentry\configureScope(fn ($scope) => $scope->setTags($tags));
+    /**
+     * Links each Sentry issue to its wide event, and tells the reader how to find it.
+     */
+    public function tagSentry(): static
+    {
+        $ids = $this->builtIn(RequestSection::class);
+
+        if (! $ids || ! config('jot.sentry.enabled', true) || ! app()->bound('sentry')) {
+            return $this;
         }
+
+        \Sentry\configureScope(function ($scope) use ($ids) {
+            $scope->setTags(['trace_id' => $ids->traceId, 'span_id' => $ids->spanId]);
+            $scope->setContext('Jot', array_filter([
+                'trace_id' => $ids->traceId,
+                'span_id' => $ids->spanId,
+                'query' => "php artisan jot:query {$ids->traceId}",
+                'link' => str_replace(['{trace_id}', '{span_id}'], [$ids->traceId, $ids->spanId], (string) config('jot.sentry.link')),
+            ]));
+        });
 
         return $this;
     }

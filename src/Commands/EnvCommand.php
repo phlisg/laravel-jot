@@ -23,6 +23,7 @@ class EnvCommand extends Command
         'JOT_SAMPLE_RATE' => '1.0',
         'JOT_SENTRY' => 'true',
         'JOT_SENTRY_LEVEL' => 'info',
+        'JOT_SENTRY_LINK' => '',
     ];
 
     public function handle(): int
