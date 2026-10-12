@@ -26,6 +26,7 @@ class DemoCommand extends Command
         'login-failed' => 'Login with a wrong password',
         'error' => 'An exception, answered with a 500',
         'query' => 'jot:query on the trace of a failed job, then on the job span',
+        'livewire' => 'A Livewire form: page load, next step, failed validation, submit',
     ];
 
     /** @var array<string, string> */
@@ -118,10 +119,34 @@ class DemoCommand extends Command
         $this->call('jot:query', ['id' => $job['span_id']]);
     }
 
+    protected function runLivewire(): void
+    {
+        preg_match('/wire:snapshot="([^"]+)"/', $this->send('GET', '/register')->getContent(), $match);
+        $snapshot = html_entity_decode($match[1]);
+
+        $snapshot = $this->livewire($snapshot, 'nextStep');
+        $snapshot = $this->livewire($snapshot, 'submit', ['email' => 'not-an-email']);
+        $this->livewire($snapshot, 'submit', ['email' => 'ada@example.com']);
+    }
+
+    /**
+     * One Livewire update, as the browser sends it. Returns the component's new snapshot.
+     */
+    protected function livewire(string $snapshot, string $method, array $updates = []): string
+    {
+        $response = $this->send('POST', '/livewire/update', ['components' => [[
+            'snapshot' => $snapshot,
+            'updates' => $updates,
+            'calls' => [['path' => '', 'method' => $method, 'params' => []]],
+        ]]], ['X-Livewire' => 'true']);
+
+        return json_decode($response->getContent(), true)['components'][0]['snapshot'];
+    }
+
     /**
      * One request through the HTTP kernel, with the state a new PHP process would start with.
      */
-    protected function send(string $method, string $uri, array $data = []): Response
+    protected function send(string $method, string $uri, array $data = [], array $headers = []): Response
     {
         $this->laravel->forgetInstance(Jot::class);
         Context::flush();
@@ -130,6 +155,7 @@ class DemoCommand extends Command
 
         $kernel = $this->laravel->make(Kernel::class);
         $request = Request::create($uri, $method, $data, $this->cookies);
+        $request->headers->add($headers);
         $response = $kernel->handle($request);
         $kernel->terminate($request, $response);
 

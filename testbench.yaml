@@ -1,6 +1,7 @@
 laravel: '@testbench'
 
 providers:
+  - Livewire\LivewireServiceProvider
   - MarvelousDigital\WideEvents\JotServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 

@@ -3,6 +3,8 @@
 namespace Workbench\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
+use Workbench\App\Livewire\RegistrationForm;
 
 class WorkbenchServiceProvider extends ServiceProvider
 {
@@ -11,5 +13,7 @@ class WorkbenchServiceProvider extends ServiceProvider
         // jot:demo sends requests in-process, so its own console event would swallow them.
         config()->push('jot.console.ignore', 'jot:demo');
         config()->push('jot.console.ignore', 'serve');
+
+        Livewire::component('registration-form', RegistrationForm::class);
     }
 }

@@ -83,6 +83,9 @@ It creates an SQLite database, runs the Laravel default migrations (users, cache
 | `login-failed` | `auth.result=failed`, no `user.id` |
 | `error` | An exception, answered with a 500 |
 | `query` | `jot:query` on the trace of a failed job, then on the job's span |
+| `livewire` | A Livewire form: the page load, then three updates (next step, failed validation, submit) with `livewire.*` fields |
+
+> After `composer update`, run `./dev php vendor/bin/testbench workbench:build`: the update resets the testbench skeleton, database included. Run Composer through `./dev` so it resolves for PHP 8.3.
 
 ### Server
 

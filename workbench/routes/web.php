@@ -3,8 +3,10 @@
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Workbench\App\Enums\PaymentProvider;
 use Workbench\App\Enums\PaymentStatus;
 use Workbench\App\Jobs\ChargeCard;
@@ -69,6 +71,10 @@ Route::withoutMiddleware([PreventRequestForgery::class])->group(function () {
             ? 'Welcome'
             : response('Wrong credentials', 401);
     })->name('login');
+
+    Route::get('/register', fn () => Blade::render('<livewire:registration-form />'))->name('register');
+
+    Livewire::setUpdateRoute(fn ($handle) => Route::post('/livewire/update', $handle)->middleware('web'));
 
     Route::get('/boom', fn () => throw new RuntimeException('Something broke'))->name('boom');
 });
