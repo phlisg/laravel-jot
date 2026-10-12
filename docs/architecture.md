@@ -108,7 +108,7 @@ The accumulator stores fields as flat dotted keys and flattens sections when it 
 
 Keys that share a first segment sit side by side, each group where its first key appeared.
 
-Each collision logs a warning on the default log channel, see "Key collisions" in the README.
+Each collision logs a warning on the default log channel, see [Key collisions](../README.md#key-collisions).
 
 ## Writing
 

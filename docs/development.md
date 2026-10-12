@@ -76,7 +76,7 @@ It creates an SQLite database, runs the Laravel default migrations (users, cache
 
 | Scenario | What it shows |
 |---|---|
-| `booking` | The four requests of "Example: paid event booking" in the README, with a `PaymentLog` section and enums |
+| `booking` | The four requests of [Example: paid event booking](../README.md#example-paid-event-booking), with a `PaymentLog` section and enums |
 | `job-failed` | A request queues a job, `queue:work --stop-when-empty` runs it, the job fails |
 | `job-sync` | A sync job inside a request: `parent_span_id` and `trace_id` point to the request |
 | `login` | `auth.result=success` and `user.id` |
@@ -141,7 +141,7 @@ Versions come from git tags, `v` plus a semantic version, for example `v0.1.0`. 
 
 Other types, such as `build:`, `test:` or `style:`, stay out of the notes. A commit subject is a line in the release notes, so write it for the people who install the package.
 
-> Until `1.0.0`, bump the minor version (`0.1` to `0.2`) for a breaking change and the patch version for anything else, see "Versioning" in the README.
+> Until `1.0.0`, bump the minor version (`0.1` to `0.2`) for a breaking change and the patch version for anything else, see [Versioning](../README.md#versioning).
 
 ### Install from another project
 

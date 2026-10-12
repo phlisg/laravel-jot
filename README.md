@@ -218,7 +218,7 @@ jot()->add(new StripePayment(
 - A class with required constructor arguments cannot be created by the package, so `jot(StripePayment::class)` throws until the instance is added with `jot()->add(new ...)`. The exception names the class and the call to make.
 - `jot()` accepts `Section` subclasses only, and throws on any other class.
 
-Section classes can extend each other, for example a `Payment` section with shared fields, extended by `StripePayment` and `PaypalPayment`. A subclass inherits its parent's `$prefix`, and then collides with it, see "Key collisions" below.
+Section classes can extend each other, for example a `Payment` section with shared fields, extended by `StripePayment` and `PaypalPayment`. A subclass inherits its parent's `$prefix`, and then collides with it, see [Key collisions](#key-collisions).
 
 A Pest architecture test keeps `app/Jot` consistent:
 
@@ -269,7 +269,7 @@ Log backends such as Elasticsearch fix a field's type the first time they see it
 
 ## Automatic fields
 
-The package adds these fields with no code in the app. Each group has a switch under `fields` in `config/jot.php`, see "Configuration" below.
+The package adds these fields with no code in the app. Each group has a switch under `fields` in `config/jot.php`, see [Configuration](#configuration).
 
 Field names follow the OpenTelemetry semantic conventions where one exists. Fields with no OpenTelemetry equivalent, such as `session.hash` or `laravel.version`, keep a Jot name.
 
@@ -297,7 +297,7 @@ By group:
 | `auth` | `auth.result`: `success` or `failed`, only on requests that attempt a login | on |
 | `locale` | `app.locale` | on |
 | `app` | `deployment.environment.name`, `service.version`, `cloud.region`, `host.name`, `process.runtime.version`, `laravel.version` | on |
-| `errors` | `error.*`, see "Errors" below | on |
+| `errors` | `error.*`, see [Errors](#errors) | on |
 | `performance` | `memory_peak_mb`, `db.query_count`, `db.time_ms`, `cache.hits`, `cache.misses`, `http_client.count`, `http_client.time_ms`, `queue.dispatched` | on |
 
 Jobs, commands and scheduled tasks add their own fields:
@@ -399,7 +399,7 @@ try {
 ```
 
 - `rescue(fn () => ...)` reports too.
-- With several exceptions, `error.*` describes the last one, usually the one that ended the request. `error.count` shows the others exist, and Sentry holds each of them, see "During a failure" below.
+- With several exceptions, `error.*` describes the last one, usually the one that ended the request. `error.count` shows the others exist, and Sentry holds each of them, see [During a failure](#during-a-failure).
 - An event with `error.type` gets the level `error`, even with a 200 response: `report()` means the exception needs attention. Sampling always keeps it.
 - Exceptions Laravel does not report, such as validation errors and 404s, add nothing.
 
@@ -518,7 +518,7 @@ return [
 
 Settings that need a decision per app:
 
-- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see "Output shapes" below. The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see "Sentry and GlitchTip" below for the levels.
+- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Sentry and GlitchTip](#sentry-and-glitchtip) for the levels.
 - `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
 - `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
 - `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
@@ -573,7 +573,7 @@ Each event gets a log level, from its fields:
 
 `JOT_SENTRY_LEVEL` sets the lowest level that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off both the logs and the tags.
 
-> Only sampled events reach Sentry, see "Sampling" above.
+> Only sampled events reach Sentry, see [Sampling](#sampling).
 
 > The SDK's own `SENTRY_LOG_LEVEL` (default: `LOG_LEVEL`) filters the same channel for every log line of the app. Keep it at or below `JOT_SENTRY_LEVEL`.
 
@@ -591,7 +591,7 @@ When the app throws, Sentry and Jot each record a part:
 2. Jot adds `error.type` and `exception.message` to the event. The event gets the level `error`, and sampling always keeps it.
 3. The issue gets the tags `trace_id` and `span_id`, and a "Jot" context that shows `php artisan jot:query <trace_id>`.
 
-From an issue to its events: run that command, see "Finding events" above. With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
+From an issue to its events: run that command, see [Finding events](#finding-events). With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
 
 From a user report to the issue: the `X-Request-Id` response header holds the `trace_id`. In Sentry, search the issues for `trace_id:<id>`.
 
