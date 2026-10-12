@@ -7,24 +7,36 @@ function initialized(string $uri = '/checkout', array $server = []): array
     return jot()->initialize(Request::create($uri, 'POST', server: $server))->event();
 }
 
-describe('request IDs', function () {
-    it('ignores an incoming request ID unless trusted', function () {
-        expect(initialized(server: ['HTTP_X_REQUEST_ID' => 'req_123'])['request_id'])->not->toBe('req_123');
+describe('trace IDs', function () {
+    it('starts a new trace in W3C format, with no parent', function () {
+        expect(initialized())->toHaveKey('trace_id')->toHaveKey('span_id')->not->toHaveKey('parent_span_id')
+            ->and(initialized()['trace_id'])->toMatch('/^[0-9a-f]{32}$/')
+            ->and(initialized()['span_id'])->toMatch('/^[0-9a-f]{16}$/');
     });
 
-    it('keeps a trusted incoming request ID, and reuses it as the trace ID', function () {
-        config(['jot.request_id.trust_incoming' => true]);
+    it('ignores incoming headers unless trusted', function () {
+        $event = initialized(server: [
+            'HTTP_X_REQUEST_ID' => 'req_123',
+            'HTTP_TRACEPARENT' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+        ]);
 
-        expect(initialized(server: ['HTTP_X_REQUEST_ID' => 'req_123']))
-            ->toMatchArray(['request_id' => 'req_123', 'trace_id' => 'req_123']);
+        expect($event['trace_id'])->not->toBe('4bf92f3577b34da6a3ce929d0e0e4736')
+            ->and($event)->not->toHaveKey('http.request.header.x-request-id');
     });
 
-    it('reads a trusted trace ID from a W3C traceparent header', function () {
-        config(['jot.request_id.trust_incoming' => true]);
+    it('continues a trusted W3C traceparent, and keeps the proxy request ID', function () {
+        config(['jot.trace.trust_incoming' => true]);
 
-        $event = initialized(server: ['HTTP_TRACEPARENT' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01']);
+        $event = initialized(server: [
+            'HTTP_X_REQUEST_ID' => 'req_123',
+            'HTTP_TRACEPARENT' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+        ]);
 
-        expect($event['trace_id'])->toBe('4bf92f3577b34da6a3ce929d0e0e4736');
+        expect($event)->toMatchArray([
+            'trace_id' => '4bf92f3577b34da6a3ce929d0e0e4736',
+            'parent_span_id' => '00f067aa0ba902b7',
+            'http.request.header.x-request-id' => 'req_123',
+        ]);
     });
 });
 
@@ -86,7 +98,7 @@ it('writes the app fields', function () {
 it('puts the identity fields first, before the app data', function () {
     jot()->add('payment.provider', 'stripe');
 
-    expect(array_slice(array_keys(initialized()), 0, 4))->toBe(['request_id', 'trace_id', 'timestamp', 'entrypoint']);
+    expect(array_slice(array_keys(initialized()), 0, 4))->toBe(['trace_id', 'span_id', 'timestamp', 'entrypoint']);
 });
 
 it('keeps a reserved value over an app field with the same key', function () {

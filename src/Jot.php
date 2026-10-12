@@ -76,7 +76,7 @@ class Jot
 
         $this->startedAt = hrtime(true);
 
-        $tags = array_filter(['request_id' => $ids->id, 'trace_id' => $ids->traceId]);
+        $tags = ['trace_id' => $ids->traceId, 'span_id' => $ids->spanId];
 
         Context::add($tags + ['origin' => $ids->origin]);
 
@@ -115,9 +115,9 @@ class Jot
         return $this->reserved[$class] ?? null;
     }
 
-    public function requestId(): ?string
+    public function traceId(): ?string
     {
-        return $this->builtIn(RequestSection::class)?->id;
+        return $this->builtIn(RequestSection::class)?->traceId;
     }
 
     public function error(Throwable $e): static

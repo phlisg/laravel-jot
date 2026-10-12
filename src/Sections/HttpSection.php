@@ -28,6 +28,10 @@ final class HttpSection extends Section
     #[Key('http.request.header.content-type')]
     public readonly ?string $contentType;
 
+    // A proxy's own request ID, read only when trusted, to find the request in the proxy's logs.
+    #[Key('http.request.header.x-request-id')]
+    public readonly ?string $requestId;
+
     #[Key(HttpIncubatingAttributes::HTTP_REQUEST_BODY_SIZE)]
     public readonly ?int $bodySize;
 
@@ -42,6 +46,7 @@ final class HttpSection extends Section
         $this->method = $request->method();
         $this->path = $request->getPathInfo();
         $this->contentType = $request->header('Content-Type');
+        $this->requestId = config('jot.trace.trust_incoming', false) ? $request->header(config('jot.trace.header', 'X-Request-Id')) : null;
         $this->bodySize = $request->header('Content-Length') !== null ? (int) $request->header('Content-Length') : null;
     }
 

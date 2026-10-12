@@ -119,14 +119,13 @@ it('adds no Sentry output when the SDK has logs off', function () {
     expect(array_column(app(Writer::class)->outputs(), 'channel'))->not->toContain('sentry_logs');
 });
 
-it('tags Sentry issues with the request and trace IDs', function () {
+it('tags Sentry issues with the trace and span IDs', function () {
     $transport = sentry();
     Route::get('/', fn () => \Sentry\captureMessage('boom') && 'ok');
 
     $response = $this->get('/');
 
-    expect($transport->events[0]->getTags())->toMatchArray([
-        'request_id' => $response->headers->get('X-Request-Id'),
-        'trace_id' => $response->headers->get('X-Request-Id'),
-    ]);
+    expect($transport->events[0]->getTags())
+        ->toMatchArray(['trace_id' => $response->headers->get('X-Request-Id')])
+        ->span_id->toMatch('/^[0-9a-f]{16}$/');
 });

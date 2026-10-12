@@ -20,7 +20,7 @@ class JotRequest
         $jot = jot()->initialize($request);
 
         $response = $next($request);
-        $response->headers->set(config('jot.request_id.header', 'X-Request-Id'), $jot->requestId());
+        $response->headers->set(config('jot.trace.header', 'X-Request-Id'), $jot->traceId());
 
         return $response;
     }

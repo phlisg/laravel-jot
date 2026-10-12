@@ -28,7 +28,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 
 Classic logs scatter many short lines across a request. Finding everything about one failed checkout means searching for strings and stitching lines together by hand.
 
-A wide event (also called a canonical log line) is a single log entry that holds all the context for one unit of work: request ID, HTTP status, duration, user, business data, errors. The code fills the event as it runs and the package writes it once, at the end. The idea comes from [loggingsucks.com](https://loggingsucks.com/), an article on why wide events beat line-by-line logs.
+A wide event (also called a canonical log line) is a single log entry that holds all the context for one unit of work: trace ID, HTTP status, duration, user, business data, errors. The code fills the event as it runs and the package writes it once, at the end. The idea comes from [loggingsucks.com](https://loggingsucks.com/), an article on why wide events beat line-by-line logs.
 
 Laravel Wide Events applies the idea with one verb: code anywhere in the request jots fields down with `jot()`, and the package writes them as one wide event.
 
@@ -47,7 +47,7 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 - Backed enums for fields with a fixed set of values.
 - Tail sampling: keep every error and slow request, sample the rest.
 - Strict mode that warns on fields outside the schema.
-- Sentry and GlitchTip: issues tagged with the request ID, events in Sentry Logs.
+- Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
 
 ## Installation
 
@@ -147,8 +147,8 @@ The emitted event contains:
 
 ```json
 {
-  "request_id": "0b6f1c1e-5d0a-4a57-9a43-3f6f0f5f2a10",
-  "trace_id": "0b6f1c1e-5d0a-4a57-9a43-3f6f0f5f2a10",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
   "http.request.method": "POST",
   "http.route": "checkout.store",
   "http.response.status_code": 402,
@@ -274,9 +274,11 @@ Field names follow the OpenTelemetry semantic conventions where one exists. Fiel
 
 Always on:
 
-- `request_id`: the `X-Request-Id` header when trusted, otherwise a new UUID (universally unique identifier). Jobs keep the `request_id` of the request, command or task that started the chain.
-- `trace_id`: an incoming trace ID when trusted, otherwise the `request_id`. Queued jobs keep it, so one trace links a request to every job it dispatched.
-- `parent_id`: on jobs, the `request_id` of the dispatching request or the `job.id` of the dispatching job.
+- `trace_id`: shared by every event in the chain, so one query finds a request and every job and command it started. New for each request, unless a trusted `traceparent` header brings one. The `X-Request-Id` response header returns it.
+- `span_id`: this event's own ID.
+- `parent_span_id`: the `span_id` of the request, job or command that started this one. Absent on the first event of a trace.
+
+The IDs follow W3C Trace Context: 32 hex characters for `trace_id`, 16 for the span IDs.
 - `timestamp`: start time, in ISO 8601 format.
 - `entrypoint`: where the unit of work entered the app: `http`, `queue`, `console` or `schedule`.
 - `origin`: the `entrypoint` of the first event in the trace. A job dispatched by a scheduled task has `entrypoint=queue` and `origin=schedule`.
@@ -286,7 +288,7 @@ By group:
 
 | Group | Fields | Default |
 |---|---|---|
-| `http` | `http.request.method`, `http.route` (the route name, such as `events.show`), `url.path`, `http.response.status_code`, `http.request.header.content-type`, `http.request.body.size`, `http.response.body.size` | on |
+| `http` | `http.request.method`, `http.route` (the route name, such as `events.show`), `url.path`, `http.response.status_code`, `http.request.header.content-type`, `http.request.header.x-request-id` (a proxy's request ID, when trusted), `http.request.body.size`, `http.response.body.size` | on |
 | `client` | `user_agent.original` (first 256 characters), `client.address` | user agent on, IP anonymized |
 | `query` | `url.query`: the query string with only the keys in `query.allow` | no key allowed |
 | `session` | `session.hash`: a keyed hash of the session ID, to link requests from the same browser session | on |
@@ -425,9 +427,10 @@ return [
         'level' => env('JOT_SENTRY_LEVEL', 'info'),
     ],
 
-    'request_id' => [
+    'trace' => [
+        // Response header that returns the trace ID.
         'header' => 'X-Request-Id',
-        // Enable only behind a proxy that sets or strips this header.
+        // Enable only behind a proxy that sets or strips traceparent and this header.
         'trust_incoming' => env('JOT_TRUST_INCOMING_HEADER', false),
     ],
 
@@ -498,7 +501,7 @@ return [
 Settings that need a decision per app:
 
 - `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see "Output shapes" below. The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see "Sentry and GlitchTip" below for the levels.
-- `request_id.trust_incoming`: off by default, so that clients cannot choose their own request ID or trace ID. Turn it on behind a proxy or load balancer that sets the header. A trusted W3C `traceparent` header also sets the `trace_id`.
+- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
 - `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
 - `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
 - `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
@@ -508,7 +511,7 @@ Settings that need a decision per app:
 
 With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works with Sentry and needs no setup:
 
-- Every Sentry issue gets the tags `request_id` and `trace_id`, which point to its wide event in the logs.
+- Every Sentry issue gets the tags `trace_id` and `span_id`, which point to its wide event in the logs.
 - With Sentry Logs on, each event also goes to Sentry Logs, with every field as a searchable attribute.
 
 GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs.

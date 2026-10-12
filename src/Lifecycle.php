@@ -124,15 +124,7 @@ class Lifecycle
         }
 
         // Laravel hydrated Context from the payload before this listener ran.
-        $parent = Context::get('job_id') ?? Context::get('request_id');
-        $job = new JobSection($e->job);
-
-        $this->push($e->job)->start(
-            new RequestSection('queue', Context::get('request_id'), Context::get('trace_id'), $parent),
-            $job,
-        );
-
-        Context::add('job_id', $job->id);
+        $this->push($e->job)->start(RequestSection::fromContext('queue'), new JobSection($e->job));
     }
 
     protected function endJob(object $job, string $status): void
@@ -147,7 +139,7 @@ class Lifecycle
         }
 
         $this->push($e->input)->start(
-            new RequestSection('console', Str::uuid()->toString(), Context::get('trace_id')),
+            RequestSection::fromContext('console'),
             new ConsoleSection($e->command),
         );
     }
@@ -201,7 +193,7 @@ class Lifecycle
         }
 
         $this->push($e->task)->start(
-            new RequestSection('schedule', Str::uuid()->toString()),
+            new RequestSection('schedule'),
             new ScheduleSection($e->task),
         );
     }

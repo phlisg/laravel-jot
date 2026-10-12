@@ -87,7 +87,7 @@ describe('http', function () {
 
         $event = emittedBy('http');
 
-        expect($response->headers->get('X-Request-Id'))->toBe($event['request_id'])
+        expect($response->headers->get('X-Request-Id'))->toBe($event['trace_id'])
             ->and($event)->toMatchArray([
                 'http.request.method' => 'GET',
                 'url.path' => '/events/42',
@@ -150,7 +150,7 @@ describe('queue', function () {
         [$job, $http] = [emittedBy('queue'), emittedBy('http')];
 
         expect($job)->toMatchArray([
-            'parent_id' => $http['request_id'],
+            'parent_span_id' => $http['span_id'],
             'trace_id' => $http['trace_id'],
             'origin' => 'http',
             'job.name' => SyncJob::class,
@@ -278,7 +278,7 @@ it('keeps the error of a job the worker fails', function () {
 });
 
 describe('ids across units of work', function () {
-    it('points a nested job at its parent job, and keeps the request and trace IDs', function () {
+    it('points a nested job at its parent job, in the same trace', function () {
         Route::get('/import', fn () => OuterJob::dispatch() && 'ok');
 
         $this->get('/import');
@@ -286,13 +286,14 @@ describe('ids across units of work', function () {
         $http = emittedBy('http');
         [$inner, $outer] = array_values(array_filter(emitted(), fn ($e) => $e['entrypoint'] === 'queue'));
 
-        expect($outer)->toMatchArray(['job.name' => OuterJob::class, 'parent_id' => $http['request_id']])
-            ->and($inner)->toMatchArray(['job.name' => SyncJob::class, 'parent_id' => $outer['job.id']])
-            ->and([$outer['request_id'], $inner['request_id']])->each->toBe($http['request_id'])
-            ->and([$outer['trace_id'], $inner['trace_id']])->each->toBe($http['trace_id']);
+        expect($outer)->toMatchArray(['job.name' => OuterJob::class, 'parent_span_id' => $http['span_id']])
+            ->and($inner)->toMatchArray(['job.name' => SyncJob::class, 'parent_span_id' => $outer['span_id']])
+            ->and($inner['parent_span_id'])->not->toBe($inner['trace_id'])
+            ->and([$outer['trace_id'], $inner['trace_id']])->each->toBe($http['trace_id'])
+            ->and([$http, $outer, $inner])->each->not->toHaveKey('request_id');
     });
 
-    it('gives a command called in a request its own request ID, in the same trace', function () {
+    it('gives a command called in a request its own span, in the same trace', function () {
         app(Kernel::class)->registerCommand(new CreateUser);
         Route::get('/users', fn () => Artisan::call('users:create', ['email' => 'jane@example.com']) === 0 ? 'ok' : 'no');
 
@@ -300,21 +301,20 @@ describe('ids across units of work', function () {
 
         [$http, $console] = [emittedBy('http'), emittedBy('console')];
 
-        expect($console['request_id'])->not->toBe($http['request_id'])
-            ->and($console)->toMatchArray(['trace_id' => $http['trace_id'], 'origin' => 'http'])
-            ->and(Context::get('request_id'))->toBe($http['request_id']);
+        expect($console)->toMatchArray(['trace_id' => $http['trace_id'], 'parent_span_id' => $http['span_id'], 'origin' => 'http'])
+            ->and($console['span_id'])->not->toBe($http['span_id'])
+            ->and(Context::get('span_id'))->toBe($http['span_id']);
     });
 
-    it('keeps an upstream trace ID apart from the request ID, down to the jobs', function () {
-        config(['jot.request_id.trust_incoming' => true]);
+    it('keeps an upstream trace down to the jobs', function () {
+        config(['jot.trace.trust_incoming' => true]);
         Route::get('/import', fn () => SyncJob::dispatch() && 'ok');
 
         $this->get('/import', ['traceparent' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01']);
 
         [$http, $job] = [emittedBy('http'), emittedBy('queue')];
 
-        expect($http['trace_id'])->toBe('4bf92f3577b34da6a3ce929d0e0e4736')
-            ->and($http['request_id'])->not->toBe($http['trace_id'])
-            ->and($job)->toMatchArray(['request_id' => $http['request_id'], 'trace_id' => $http['trace_id']]);
+        expect($http)->toMatchArray(['trace_id' => '4bf92f3577b34da6a3ce929d0e0e4736', 'parent_span_id' => '00f067aa0ba902b7'])
+            ->and($job)->toMatchArray(['trace_id' => $http['trace_id'], 'parent_span_id' => $http['span_id']]);
     });
 });

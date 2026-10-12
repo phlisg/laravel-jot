@@ -14,10 +14,9 @@ How Jot collects fields during a unit of work and writes them as one event. For 
 
 Laravel Context shares data across a request and the jobs it dispatches. Jot stores IDs there and nothing else:
 
-- `request_id`: the request, command or scheduled task that started the chain.
 - `trace_id`: shared by every event in the chain.
+- `span_id`: the event running now, so a job or command it starts can point back to it.
 - `origin`: the `entrypoint` of the first event in the chain.
-- `job_id`: the job running now, so a job it dispatches can point back to it.
 
 Context is appended to every log line and copied into every dispatched job. Fields stored there would copy the whole request event into each job event.
 
@@ -30,12 +29,12 @@ sequenceDiagram
     participant App
     participant Queue
     participant Job
-    Client->>Middleware: request (X-Request-Id optional)
-    Middleware->>Middleware: Context::add request_id, trace_id
+    Client->>Middleware: request (traceparent optional)
+    Middleware->>Middleware: Context::add trace_id, span_id
     Middleware->>App: handle
     App->>App: jot()->add(...)
     App->>Queue: dispatch job (Context travels along)
-    Middleware-->>Client: response + X-Request-Id
+    Middleware-->>Client: response + X-Request-Id (trace_id)
     Middleware->>Middleware: terminate: add user, status, duration, emit
     Queue->>Job: JobProcessing: new accumulator, job fields
     Job->>Job: jot()->add(...)
@@ -46,7 +45,7 @@ HTTP:
 
 1. `handle()` builds the request sections and adds the IDs to Context.
 2. The app adds fields during the request.
-3. `handle()` adds the `X-Request-Id` header to the response.
+3. `handle()` adds the `X-Request-Id` header, holding the `trace_id`, to the response.
 4. `terminate()` adds the end-of-request fields (route, status, user, session, locale), then emits.
 
 The route is read in `terminate()`: global middleware runs before routing.
@@ -55,7 +54,7 @@ Queue:
 
 1. On dispatch, Laravel copies Context into the job payload (key `illuminate:log:context`).
 2. On `JobProcessing`, Laravel restores that Context first. Jot then starts a fresh accumulator with `job.id`, `job.name`, `job.queue` and `job.attempt`.
-3. `parent_id` is the `job_id` in Context, or else its `request_id`. Jot then puts the new `job.id` in Context.
+3. `trace_id` and `parent_span_id` come from Context. Jot then puts the job's new `span_id` in Context.
 4. The first of these events emits, with its `job.status`:
    - `JobProcessed`: `processed`
    - `JobFailed`: `failed`
@@ -63,17 +62,19 @@ Queue:
 
 The worker reports a job's exception after the job event is gone. Jot listens to `JobExceptionOccurred` to fill `error.*` while the job event is still open.
 
-The `parent_id` links form a tree, and every event in it shares one `trace_id`:
+The `parent_span_id` links form a tree, and every event in it shares one `trace_id`:
 
 ```
-request  request_id=req_1
-└─ job A  job.id=job_7  parent_id=req_1
-   └─ job B  job.id=job_9  parent_id=job_7
+request  span_id=a1  trace_id=t1
+└─ job A  span_id=b2  parent_span_id=a1  trace_id=t1
+   └─ job B  span_id=c3  parent_span_id=b2  trace_id=t1
 ```
+
+The IDs follow W3C Trace Context, as in OpenTelemetry. `job.id` stays Laravel's job UUID, apart from `span_id`.
 
 Console:
 
-1. On `CommandStarting`, Jot starts an accumulator with `entrypoint=console`, a new `request_id` and `console.command`. `trace_id` comes from Context when set, otherwise it is new.
+1. On `CommandStarting`, Jot starts an accumulator with `entrypoint=console`, a new `span_id` and `console.command`. `trace_id` and `parent_span_id` come from Context when set, so `Artisan::call()` in a request joins its trace.
 2. On `CommandFinished`, Jot adds `console.exit_code`, `console.arguments` and `console.options`, then emits.
 
 The names of arguments and options are read at the end, once the input is bound to the command definition. Only those that differ from their default are kept.
@@ -113,7 +114,7 @@ Each collision logs a warning on the default log channel, see "Key collisions" i
 
 `Writer` decides at emit time whether to keep the event (tail sampling), then writes it once per entry in `outputs`. Each output shape is built from the flat event when it is written.
 
-Each event gets a log level from its fields (`Writer::level()`), and an output with a `level` key skips events below it. When the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already. `Jot::start()` also tags the Sentry scope with `request_id` and `trace_id`.
+Each event gets a log level from its fields (`Writer::level()`), and an output with a `level` key skips events below it. When the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already. `Jot::start()` also tags the Sentry scope with `trace_id` and `span_id`.
 
 An output with channel `null` writes to a daily file, `storage/logs/jot.log`, with Monolog's `JsonFormatter`. Errors while writing are reported and swallowed: logging never breaks the app.
 
@@ -125,5 +126,5 @@ An output with channel `null` writes to a daily file, `storage/logs/jot.log`, wi
 
 ## Out of scope
 
-- W3C `traceparent` header propagation between services. Add when several services need one shared trace.
+- An outgoing `traceparent` header on HTTP client calls. Add when several services need one shared trace.
 - Index templates or schema docs generated from section classes.

@@ -20,9 +20,10 @@ return [
         'level' => env('JOT_SENTRY_LEVEL', 'info'),
     ],
 
-    'request_id' => [
+    'trace' => [
+        // Response header that returns the trace ID.
         'header' => 'X-Request-Id',
-        // Enable only behind a proxy that sets or strips this header.
+        // Enable only behind a proxy that sets or strips traceparent and this header.
         'trust_incoming' => env('JOT_TRUST_INCOMING_HEADER', false),
     ],
 
