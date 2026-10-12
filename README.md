@@ -14,6 +14,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 - [Loose fields](#loose-fields)
 - [Field conventions](#field-conventions)
 - [Automatic fields](#automatic-fields)
+- [Livewire](#livewire)
 - [Example: paid event booking](#example-paid-event-booking)
 - [Errors](#errors)
 - [Sampling](#sampling)
@@ -50,6 +51,7 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 - Strict mode that warns on fields outside the schema.
 - Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
 - `jot:query`: finds every event of a trace in the log files.
+- Livewire and Filament: the components, calls and failed validations of each Livewire update.
 
 ## Installation
 
@@ -163,6 +165,8 @@ return [
         'locale' => true,
         'app' => true,
         'errors' => true,
+        // Components, calls and validation errors of Livewire update requests, when Livewire is installed.
+        'livewire' => true,
 
         'performance' => [
             'memory' => true,
@@ -480,6 +484,55 @@ Jot::user(fn (User $user) => [
 ```
 
 The callback runs at the end of each request that has an authenticated user.
+
+## Livewire
+
+With Livewire 3 or 4 installed, each Livewire update request records what its components did. Livewire sends every click, live input change and poll as a `POST` to its update route, so without these fields all those events look alike.
+
+A registration form, submitted with an invalid email:
+
+```json
+{
+  "http.route": "livewire.update",
+  "http.response.status_code": 200,
+  "livewire.page": "events/42/register",
+  "livewire.components": ["registration-form"],
+  "livewire.calls": ["registration-form::submit"],
+  "livewire.updates": ["email"],
+  "livewire.validation_failed": true,
+  "livewire.validation_fields": ["email"]
+}
+```
+
+- `livewire.page`: the path of the page the components sit on, without the leading slash.
+- `livewire.components`: the component names. One request can carry several components.
+- `livewire.calls`: the methods called, as `component::method`.
+- `livewire.updates`: the property paths changed through `wire:model`.
+- `livewire.events`: the names of the events dispatched to the components.
+- `livewire.lazy`: `true` when a lazy component loads.
+- `livewire.poll`: `true` on a `wire:poll` request. Livewire 4 only.
+- `livewire.validation_failed`, `livewire.validation_fields`: a failed validation and the fields that failed. Livewire answers it with a 200 and never reports it, so these fields are its only trace.
+- `filament.action`: the Filament action the user opened or ran, such as `delete`.
+
+Each list holds up to 10 entries. The first page load writes a plain HTTP event. File uploads have their own routes, visible in `http.route`. The switch is `fields.livewire` in `config/jot.php`.
+
+> Security: the package logs method names, property paths and event names, never values or parameters. What a user types in a form, such as an email or a password, stays out of the event.
+
+### Polling
+
+A component with `wire:poll` sends a request every few seconds while the page stays open, and each request writes an event. A `dropWhen` rule removes them, see [Sampling](#sampling):
+
+```php
+Jot::dropWhen(fn (array $event) => ($event['livewire.calls'] ?? null) === ['registration-form::checkStatus']);
+```
+
+On Livewire 4, `livewire.poll` marks every poll:
+
+```php
+Jot::dropWhen(fn (array $event) => $event['livewire.poll'] ?? false);
+```
+
+Errors and slow polls are still kept.
 
 ## Example: paid event booking
 
