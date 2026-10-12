@@ -95,6 +95,12 @@ it('writes the app fields', function () {
     ]);
 });
 
+it('leaves out app values set empty in .env', function () {
+    config(['jot.app.version' => '', 'jot.app.region' => '']);
+
+    expect(initialized())->not->toHaveKeys(['service.version', 'cloud.region']);
+});
+
 it('puts the identity fields first, before the app data', function () {
     jot()->add('payment.provider', 'stripe');
 

@@ -33,8 +33,9 @@ final class AppSection extends Section
     public function __construct()
     {
         $this->environment = (string) config('app.env');
-        $this->version = config('jot.app.version');
-        $this->region = config('jot.app.region');
+        // ?: not ??: jot:env writes the keys empty, and env() reads APP_VERSION= as "".
+        $this->version = config('jot.app.version') ?: null;
+        $this->region = config('jot.app.region') ?: null;
         $this->host = gethostname();
         $this->php = PHP_VERSION;
         $this->laravel = app()->version();
