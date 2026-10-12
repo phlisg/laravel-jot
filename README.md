@@ -9,6 +9,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Configuration](#configuration)
 - [Sections](#sections)
 - [Loose fields](#loose-fields)
 - [Field conventions](#field-conventions)
@@ -16,7 +17,6 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 - [Example: paid event booking](#example-paid-event-booking)
 - [Errors](#errors)
 - [Sampling](#sampling)
-- [Configuration](#configuration)
 - [Finding events](#finding-events)
 - [Sentry and GlitchTip](#sentry-and-glitchtip)
 - [Output shapes](#output-shapes)
@@ -103,6 +103,110 @@ Jot::add('payment.provider', 'stripe');
 Without an import, the root alias works too: `\Jot::add(...)`. The pair mirrors Laravel's own `logger()` helper and `Log` facade.
 
 > The package declares `jot()` inside `if (! function_exists('jot'))`. If another package or the app defines `jot()` first, that definition wins and no error occurs. Use the facade in that case.
+
+## Configuration
+
+Every setting lives in `config/jot.php`. The file lists each feature with its default, so the app turns features on or off in one place. Publish it with `php artisan jot:install`.
+
+```php
+use MarvelousDigital\WideEvents\Enums\OutputShape;
+
+return [
+
+    'enabled' => env('JOT_ENABLED', true),
+
+    // One entry per destination. Each output writes the same event in its own shape.
+    'outputs' => [
+        // channel null: a daily file in storage/logs with one JSON object per line.
+        // level: optional, the lowest event level this output writes.
+        ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
+    ],
+
+    // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
+    // Events below this level stay out of Sentry: error, warning, notice or info.
+    'sentry' => [
+        'enabled' => env('JOT_SENTRY', true),
+        'level' => env('JOT_SENTRY_LEVEL', 'info'),
+        // Optional URL to the event in your log backend, shown on each Sentry issue. Placeholders: {trace_id}, {span_id}.
+        'link' => env('JOT_SENTRY_LINK'),
+    ],
+
+    'trace' => [
+        // Response header that returns the trace ID.
+        'header' => 'X-Request-Id',
+        // Enable only behind a proxy that sets or strips traceparent and this header.
+        'trust_incoming' => env('JOT_TRUST_INCOMING_HEADER', false),
+    ],
+
+    'app' => [
+        'version' => env('APP_VERSION'),
+        'region' => env('JOT_REGION'),
+    ],
+
+    'fields' => [
+        'http' => true,
+
+        'client' => [
+            'user_agent' => true,
+            // false, 'anonymized' or 'full'. An IP address is personal data under the GDPR.
+            'ip' => 'anonymized',
+        ],
+
+        // Query keys to log, wildcards allowed, e.g. ['utm_*']. Never list token keys.
+        'query' => [
+            'allow' => [],
+        ],
+
+        'session' => true,
+        'user' => true,
+        'auth' => true,
+        'locale' => true,
+        'app' => true,
+        'errors' => true,
+
+        'performance' => [
+            'memory' => true,
+            'db' => true,
+            'cache' => true,
+            'http_client' => true,
+            'queue' => true,
+        ],
+    ],
+
+    'queue' => [
+        'enabled' => true,
+    ],
+
+    'console' => [
+        'enabled' => true,
+        'schedule' => true,
+        // Long-running commands, wildcards allowed.
+        'ignore' => [
+            'queue:work', 'queue:listen', 'horizon*', 'octane:*', 'reverb:start',
+            'schedule:run', 'schedule:work', 'pail', 'tinker',
+        ],
+    ],
+
+    // Logs a warning for each string key written outside a section.
+    'strict' => env('JOT_STRICT', false),
+
+    'sampling' => [
+        // Share of normal events to keep, from 0.0 to 1.0. Errors and slow events are always kept.
+        'rate' => env('JOT_SAMPLE_RATE', 1.0),
+        'slow_ms' => 1000,
+    ],
+
+];
+```
+
+Settings that need a decision per app:
+
+- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Sentry and GlitchTip](#sentry-and-glitchtip) for the levels.
+- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
+- `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
+- `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
+- `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
+- `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%.
 
 ## Sections
 
@@ -443,110 +547,6 @@ Register custom rules in a service provider:
 ```php
 Jot::keepWhen(fn (array $event) => ($event['user.plan'] ?? null) === 'enterprise');
 ```
-
-## Configuration
-
-Every setting lives in `config/jot.php`. The file lists each feature with its default, so the app turns features on or off in one place. Publish it with `php artisan jot:install`.
-
-```php
-use MarvelousDigital\WideEvents\Enums\OutputShape;
-
-return [
-
-    'enabled' => env('JOT_ENABLED', true),
-
-    // One entry per destination. Each output writes the same event in its own shape.
-    'outputs' => [
-        // channel null: a daily file in storage/logs with one JSON object per line.
-        // level: optional, the lowest event level this output writes.
-        ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
-    ],
-
-    // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
-    // Events below this level stay out of Sentry: error, warning, notice or info.
-    'sentry' => [
-        'enabled' => env('JOT_SENTRY', true),
-        'level' => env('JOT_SENTRY_LEVEL', 'info'),
-        // Optional URL to the event in your log backend, shown on each Sentry issue. Placeholders: {trace_id}, {span_id}.
-        'link' => env('JOT_SENTRY_LINK'),
-    ],
-
-    'trace' => [
-        // Response header that returns the trace ID.
-        'header' => 'X-Request-Id',
-        // Enable only behind a proxy that sets or strips traceparent and this header.
-        'trust_incoming' => env('JOT_TRUST_INCOMING_HEADER', false),
-    ],
-
-    'app' => [
-        'version' => env('APP_VERSION'),
-        'region' => env('JOT_REGION'),
-    ],
-
-    'fields' => [
-        'http' => true,
-
-        'client' => [
-            'user_agent' => true,
-            // false, 'anonymized' or 'full'. An IP address is personal data under the GDPR.
-            'ip' => 'anonymized',
-        ],
-
-        // Query keys to log, wildcards allowed, e.g. ['utm_*']. Never list token keys.
-        'query' => [
-            'allow' => [],
-        ],
-
-        'session' => true,
-        'user' => true,
-        'auth' => true,
-        'locale' => true,
-        'app' => true,
-        'errors' => true,
-
-        'performance' => [
-            'memory' => true,
-            'db' => true,
-            'cache' => true,
-            'http_client' => true,
-            'queue' => true,
-        ],
-    ],
-
-    'queue' => [
-        'enabled' => true,
-    ],
-
-    'console' => [
-        'enabled' => true,
-        'schedule' => true,
-        // Long-running commands, wildcards allowed.
-        'ignore' => [
-            'queue:work', 'queue:listen', 'horizon*', 'octane:*', 'reverb:start',
-            'schedule:run', 'schedule:work', 'pail', 'tinker',
-        ],
-    ],
-
-    // Logs a warning for each string key written outside a section.
-    'strict' => env('JOT_STRICT', false),
-
-    'sampling' => [
-        // Share of normal events to keep, from 0.0 to 1.0. Errors and slow events are always kept.
-        'rate' => env('JOT_SAMPLE_RATE', 1.0),
-        'slow_ms' => 1000,
-    ],
-
-];
-```
-
-Settings that need a decision per app:
-
-- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Sentry and GlitchTip](#sentry-and-glitchtip) for the levels.
-- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
-- `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
-- `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
-- `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
-- `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%.
 
 ## Finding events
 
