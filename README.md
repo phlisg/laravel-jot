@@ -55,7 +55,7 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 composer require marvelous-digital/laravel-wide-events
 ```
 
-The repository is private: add it to the app's Composer `repositories` first, see "Install from another project" in `docs/development.md`.
+The repository is private: add it to the app's Composer `repositories` first, see [Install from another project](docs/development.md#install-from-another-project).
 
 Nothing else is required. The package registers its helper, service provider, global middleware and event listeners itself, and its defaults apply until the app publishes `config/jot.php`.
 
@@ -575,9 +575,9 @@ The package follows semantic versioning and starts at `0.x`. Until `1.0.0`, a mi
 
 `1.0.0` comes once the public API (`jot()`, the `Jot` facade, `Section`, `config/jot.php`) is stable.
 
-Release steps, and how to install a version from another project: see "Releases" in `docs/development.md`.
+Release steps and release notes: see [Releases](docs/development.md#releases). To install a version in another project: see [Install from another project](docs/development.md#install-from-another-project).
 
 ## Contributing
 
-- `docs/architecture.md`: how the package collects and writes events, request and job lifecycle, open questions.
-- `docs/development.md`: Docker setup, tests, static analysis, PHP versions, the workbench app that runs demo scenarios, and releases.
+- [docs/architecture.md](docs/architecture.md): how the package collects and writes events, request and job lifecycle, open questions.
+- [docs/development.md](docs/development.md): Docker setup, tests, static analysis, PHP versions, the workbench app that runs demo scenarios, and releases.
