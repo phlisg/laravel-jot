@@ -169,6 +169,16 @@ class Jot
         app(Writer::class)->rules[] = $rule;
     }
 
+    /**
+     * A sampling rule: an event it returns true for is never written, unless it failed or was slow.
+     *
+     * @param  Closure(array<string, mixed>): bool  $rule
+     */
+    public function dropWhen(Closure $rule): void
+    {
+        app(Writer::class)->drops[] = $rule;
+    }
+
     public function fake(): void
     {
         app(Writer::class)->faked = [];

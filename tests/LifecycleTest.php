@@ -18,11 +18,11 @@ use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Route;
+use LogicException;
 use MarvelousDigital\WideEvents\Contracts\Retriable;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Writer;
-use LogicException;
 use RuntimeException;
 
 class RetriableException extends RuntimeException implements Retriable {}
@@ -237,6 +237,20 @@ describe('sampling', function () {
 
         expect(array_column(emitted(), 'url.path'))->toBe(['/vip', '/boom']);
     });
+});
+
+it('drops events a rule matches, but keeps their errors', function () {
+    Jot::dropWhen(fn (array $event) => str_starts_with($event['url.path'] ?? '', '/poll'));
+    Jot::keepWhen(fn () => true);
+    Route::get('/poll', fn () => 'ok');
+    Route::get('/poll/boom', fn () => abort(503));
+    Route::get('/', fn () => 'ok');
+
+    $this->get('/poll');
+    $this->get('/poll/boom');
+    $this->get('/');
+
+    expect(array_column(emitted(), 'url.path'))->toBe(['/poll/boom', '/']);
 });
 
 it('asserts on emitted events', function () {

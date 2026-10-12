@@ -18,6 +18,9 @@ class Writer
     /** @var list<Closure(array<string, mixed>): bool> */
     public array $rules = [];
 
+    /** @var list<Closure(array<string, mixed>): bool> */
+    public array $drops = [];
+
     public ?Closure $user = null;
 
     /** @var list<array<string, mixed>>|null null unless faked */
@@ -100,6 +103,12 @@ class Writer
             || isset($event['error.type'])
             || ($event['duration_ms'] ?? 0) > config('jot.sampling.slow_ms', 1000)) {
             return true;
+        }
+
+        foreach ($this->drops as $rule) {
+            if ($rule($event)) {
+                return false;
+            }
         }
 
         foreach ($this->rules as $rule) {

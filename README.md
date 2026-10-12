@@ -539,13 +539,16 @@ The package decides at emit time whether to write the event (tail sampling). It 
 
 - Every event with `http.response.status_code` of 500 or more, a failed job, or an `error.type`.
 - Every event slower than `sampling.slow_ms`.
-- Every event where a custom rule returns `true`, for example enterprise customers.
+- Every event where a `keepWhen` rule returns `true`, for example enterprise customers.
 - A random `sampling.rate` share of all other events.
 
-Register custom rules in a service provider:
+A `dropWhen` rule removes events that are frequent and alike, such as a health check or a page that polls the server every few seconds. It wins over `keepWhen` and `sampling.rate`. Errors and slow events are still kept.
+
+Register rules in a service provider:
 
 ```php
 Jot::keepWhen(fn (array $event) => ($event['user.plan'] ?? null) === 'enterprise');
+Jot::dropWhen(fn (array $event) => ($event['http.route'] ?? null) === 'health');
 ```
 
 ## Finding events
