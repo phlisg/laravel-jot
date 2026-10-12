@@ -243,7 +243,7 @@ On a collision, the package keeps the last write and logs a warning on the app's
 [jot] Key "payment.provider" was already added by App\Jot\StripePayment, then overwritten by a string key.
 ```
 
-Automatic fields always win over app fields with the same key.
+The fields the package adds itself, listed in [Automatic fields](#automatic-fields), always win over app fields with the same key. `jot()->add('user.id', 5)` is overwritten by the logged-in user's ID, with a warning.
 
 ## Loose fields
 
