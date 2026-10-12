@@ -80,6 +80,22 @@ beforeEach(function () {
 });
 
 describe('http', function () {
+    it('adds a caught exception passed to report() to the event', function () {
+        Route::get('/sync', function () {
+            try {
+                throw new RuntimeException('CRM down');
+            } catch (RuntimeException $e) {
+                report($e);
+            }
+
+            return 'ok';
+        });
+
+        $this->get('/sync')->assertOk();
+
+        expect(emittedBy('http'))->toMatchArray(['error.type' => RuntimeException::class, 'exception.message' => 'CRM down']);
+    });
+
     it('writes one event at the end of the request', function () {
         Route::get('/events/{event}', fn () => jot()->add('booking.event_id', 42) && 'ok')->name('events.show');
 
