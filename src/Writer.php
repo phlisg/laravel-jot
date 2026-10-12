@@ -1,11 +1,11 @@
 <?php
 
-namespace Phlisg\Jot;
+namespace MarvelousDigital\WideEvents;
 
 use Closure;
 use Illuminate\Support\Facades\Log;
+use MarvelousDigital\WideEvents\Enums\OutputShape;
 use Monolog\Formatter\JsonFormatter;
-use Phlisg\Jot\Enums\OutputShape;
 use Psr\Log\LoggerInterface;
 
 /**

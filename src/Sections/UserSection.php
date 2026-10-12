@@ -1,11 +1,11 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
 use Illuminate\Http\Request;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 use OpenTelemetry\SemConv\Incubating\Attributes\UserIncubatingAttributes;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
 
 /**
  * Read at the end of the request, so a login during the request is included.

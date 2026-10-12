@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot\Commands;
+namespace MarvelousDigital\WideEvents\Commands;
 
 use Illuminate\Console\GeneratorCommand;
 use Symfony\Component\Console\Attribute\AsCommand;

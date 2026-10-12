@@ -1,13 +1,13 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ServiceAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\DeploymentIncubatingAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\HostIncubatingAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\ProcessIncubatingAttributes;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
 
 final class AppSection extends Section
 {

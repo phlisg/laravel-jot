@@ -1,9 +1,9 @@
 <?php
 
-namespace Phlisg\Jot\Tests;
+namespace MarvelousDigital\WideEvents\Tests;
 
+use MarvelousDigital\WideEvents\JotServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Phlisg\Jot\JotServiceProvider;
 
 class TestCase extends Orchestra
 {

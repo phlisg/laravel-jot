@@ -1,9 +1,9 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
 use Illuminate\Console\Scheduling\Event;
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 
 final class ScheduleSection extends Section
 {

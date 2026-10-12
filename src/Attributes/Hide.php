@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot\Attributes;
+namespace MarvelousDigital\WideEvents\Attributes;
 
 use Attribute;
 

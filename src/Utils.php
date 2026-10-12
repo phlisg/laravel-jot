@@ -1,11 +1,11 @@
 <?php
 
-namespace Phlisg\Jot;
+namespace MarvelousDigital\WideEvents;
 
 use BackedEnum;
 use Illuminate\Support\Str;
-use Phlisg\Jot\Attributes\Hide;
-use Phlisg\Jot\Attributes\Key;
+use MarvelousDigital\WideEvents\Attributes\Hide;
+use MarvelousDigital\WideEvents\Attributes\Key;
 use ReflectionObject;
 use ReflectionProperty;
 

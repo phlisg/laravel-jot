@@ -1,8 +1,8 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 
 /**
  * Argument and option names only, never their values: values can carry secrets.

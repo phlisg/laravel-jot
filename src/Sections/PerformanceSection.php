@@ -1,9 +1,9 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 
 /**
  * Counters filled by the listeners in Lifecycle. A null counter is switched off.

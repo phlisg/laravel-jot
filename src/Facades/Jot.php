@@ -1,16 +1,16 @@
 <?php
 
-namespace Phlisg\Jot\Facades;
+namespace MarvelousDigital\WideEvents\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Phlisg\Jot\Jot
+ * @see \MarvelousDigital\WideEvents\Jot
  */
 class Jot extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Phlisg\Jot\Jot::class;
+        return \MarvelousDigital\WideEvents\Jot::class;
     }
 }

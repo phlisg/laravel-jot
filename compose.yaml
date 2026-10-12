@@ -5,7 +5,7 @@ services:
       context: .
       args:
         PHP_VERSION: ${PHP_VERSION:-8.3}
-    image: laravel-jot-php:${PHP_VERSION:-8.3}
+    image: laravel-wide-events-php:${PHP_VERSION:-8.3}
     user: "${UID:-1000}:${GID:-1000}"
     working_dir: /app
     ports:

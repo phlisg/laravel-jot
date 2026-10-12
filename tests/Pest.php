@@ -1,5 +1,5 @@
 <?php
 
-use Phlisg\Jot\Tests\TestCase;
+use MarvelousDigital\WideEvents\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);

@@ -1,7 +1,7 @@
 laravel: '@testbench'
 
 providers:
-  - Phlisg\Jot\JotServiceProvider
+  - MarvelousDigital\WideEvents\JotServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 
 migrations: true

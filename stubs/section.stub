@@ -2,7 +2,7 @@
 
 namespace {{ namespace }};
 
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 
 final class {{ class }} extends Section
 {

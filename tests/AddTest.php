@@ -1,8 +1,8 @@
 <?php
 
-namespace Phlisg\Jot\Tests;
+namespace MarvelousDigital\WideEvents\Tests;
 
-use Phlisg\Jot\Jot;
+use MarvelousDigital\WideEvents\Jot;
 
 enum Field: string
 {

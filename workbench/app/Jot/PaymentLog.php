@@ -2,7 +2,7 @@
 
 namespace Workbench\App\Jot;
 
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 use Workbench\App\Enums\PaymentProvider;
 use Workbench\App\Enums\PaymentStatus;
 

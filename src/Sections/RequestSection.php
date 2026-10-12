@@ -1,12 +1,12 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 
 /**
  * Always on: the IDs that link one event to the others in its trace.

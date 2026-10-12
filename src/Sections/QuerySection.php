@@ -1,13 +1,13 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\UrlAttributes;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
 
 /**
  * The query string, with only the keys listed in jot.fields.query.allow.

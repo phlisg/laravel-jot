@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot;
+namespace MarvelousDigital\WideEvents;
 
 use Illuminate\Support\Str;
 

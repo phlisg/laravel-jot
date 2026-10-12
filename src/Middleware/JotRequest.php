@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot\Middleware;
+namespace MarvelousDigital\WideEvents\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;

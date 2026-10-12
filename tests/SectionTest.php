@@ -1,11 +1,11 @@
 <?php
 
-namespace Phlisg\Jot\Tests;
+namespace MarvelousDigital\WideEvents\Tests;
 
-use Phlisg\Jot\Attributes\Hide;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Attributes\Hide;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Exceptions\JotSectionRequiresInitialisation;
+use MarvelousDigital\WideEvents\Section;
 
 class MySection extends Section {}
 

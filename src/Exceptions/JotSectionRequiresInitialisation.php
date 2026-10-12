@@ -1,9 +1,9 @@
 <?php
 
-namespace Phlisg\Jot\Exceptions;
+namespace MarvelousDigital\WideEvents\Exceptions;
 
 use LogicException;
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 
 class JotSectionRequiresInitialisation extends LogicException
 {

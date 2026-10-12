@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot\Tests;
+namespace MarvelousDigital\WideEvents\Tests;
 
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\GenericUser;
@@ -17,10 +17,10 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
-use Phlisg\Jot\Contracts\Retriable;
-use Phlisg\Jot\Enums\OutputShape;
-use Phlisg\Jot\Facades\Jot;
-use Phlisg\Jot\Writer;
+use MarvelousDigital\WideEvents\Contracts\Retriable;
+use MarvelousDigital\WideEvents\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Facades\Jot;
+use MarvelousDigital\WideEvents\Writer;
 use RuntimeException;
 
 class RetriableException extends RuntimeException implements Retriable {}

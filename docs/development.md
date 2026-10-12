@@ -34,7 +34,7 @@ Runs one command in the PHP container, from the repository root.
 
 ## PHP versions
 
-`PHP_VERSION` picks the PHP version: `8.3` (default), `8.4` or `8.5`. Each version builds its own image, tagged `laravel-jot-php:<version>`.
+`PHP_VERSION` picks the PHP version: `8.3` (default), `8.4` or `8.5`. Each version builds its own image, tagged `laravel-wide-events-php:<version>`.
 
 ```sh
 PHP_VERSION=8.5 ./dev composer update

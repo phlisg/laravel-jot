@@ -1,6 +1,6 @@
 <?php
 
-use Phlisg\Jot\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Enums\OutputShape;
 
 return [
 

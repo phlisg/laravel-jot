@@ -1,3 +1,3 @@
 # Changelog
 
-All notable changes to `laravel-jot` will be documented in this file.
+All notable changes to `laravel-wide-events` will be documented in this file.

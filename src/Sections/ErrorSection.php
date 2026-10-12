@@ -1,12 +1,12 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Contracts\Retriable;
+use MarvelousDigital\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ErrorAttributes;
 use OpenTelemetry\SemConv\Attributes\ExceptionAttributes;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Contracts\Retriable;
-use Phlisg\Jot\Section;
 use Throwable;
 
 final class ErrorSection extends Section

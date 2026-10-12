@@ -1,12 +1,12 @@
 {
-    "name": "phlisg/laravel-jot",
+    "name": "marvelous-digital/laravel-wide-events",
     "description": "One structured log event per request and per queued job, with a typed schema.",
     "keywords": [
-        "phlisg",
+        "marvelous-digital",
         "laravel",
-        "laravel-jot"
+        "laravel-wide-events"
     ],
-    "homepage": "https://github.com/phlisg/laravel-jot",
+    "homepage": "https://github.com/Marvelous-Digital/laravel-wide-events",
     "license": "MIT",
     "authors": [
         {
@@ -36,7 +36,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Phlisg\\Jot\\": "src/"
+            "MarvelousDigital\\WideEvents\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -44,7 +44,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Phlisg\\Jot\\Tests\\": "tests/",
+            "MarvelousDigital\\WideEvents\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/",
             "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
@@ -67,10 +67,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Phlisg\\Jot\\JotServiceProvider"
+                "MarvelousDigital\\WideEvents\\JotServiceProvider"
             ],
             "aliases": {
-                "Jot": "Phlisg\\Jot\\Facades\\Jot"
+                "Jot": "MarvelousDigital\\WideEvents\\Facades\\Jot"
             }
         }
     },

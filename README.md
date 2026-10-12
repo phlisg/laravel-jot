@@ -1,6 +1,6 @@
-# Laravel Jot
+# Laravel Wide Events
 
-Laravel Jot writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
+Laravel Wide Events writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
 
 ## Why
 
@@ -8,7 +8,7 @@ Classic logs scatter many short lines across a request. Finding everything about
 
 A wide event (also called a canonical log line) is a single log entry that holds all the context for one unit of work: request ID, HTTP status, duration, user, business data, errors. The code fills the event as it runs and the package writes it once, at the end. The idea comes from [loggingsucks.com](https://loggingsucks.com/), an article on why wide events beat line-by-line logs.
 
-Laravel Jot applies the idea with one verb: code anywhere in the request jots fields down with `jot()`, and the package writes them as one wide event.
+Laravel Wide Events applies the idea with one verb: code anywhere in the request jots fields down with `jot()`, and the package writes them as one wide event.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Laravel Jot applies the idea with one verb: code anywhere in the request jots fi
 ## Installation
 
 ```sh
-composer require phlisg/laravel-jot
+composer require marvelous-digital/laravel-wide-events
 ```
 
 Nothing else is required. The package registers its helper, service provider, global middleware and event listeners itself, and its defaults apply until the app publishes `config/jot.php`.
@@ -66,7 +66,7 @@ Fields never carry over from one request to the next, and each job, command or s
 The `Jot` facade exposes the same methods. Use it when the app already has its own `jot()` function, or in service providers and tests:
 
 ```php
-use Phlisg\Jot\Facades\Jot;
+use MarvelousDigital\WideEvents\Facades\Jot;
 
 Jot::add('payment.provider', 'stripe');
 ```
@@ -77,10 +77,10 @@ Without an import, the root alias works too: `\Jot::add(...)`. The pair mirrors 
 
 ## Sections
 
-A section is a class that groups related fields under one key prefix, for example `payment`. It extends `Phlisg\Jot\Section` and declares typed, public properties: they are the schema for that group.
+A section is a class that groups related fields under one key prefix, for example `payment`. It extends `MarvelousDigital\WideEvents\Section` and declares typed, public properties: they are the schema for that group.
 
 ```php
-use Phlisg\Jot\Section;
+use MarvelousDigital\WideEvents\Section;
 
 final class PaymentLog extends Section
 {
@@ -148,8 +148,8 @@ Two attributes change the rules for one property:
 
 ```php
 use OpenTelemetry\SemConv\Attributes\UrlAttributes;
-use Phlisg\Jot\Attributes\Hide;
-use Phlisg\Jot\Attributes\Key;
+use MarvelousDigital\WideEvents\Attributes\Hide;
+use MarvelousDigital\WideEvents\Attributes\Key;
 
 final class CheckoutLog extends Section
 {
@@ -197,7 +197,7 @@ A Pest architecture test keeps `app/Jot` consistent:
 ```php
 arch('jot sections')
     ->expect('App\Jot')
-    ->toExtend(Phlisg\Jot\Section::class);
+    ->toExtend(MarvelousDigital\WideEvents\Section::class);
 ```
 
 ### Key collisions
@@ -309,7 +309,7 @@ The user tries again with the right password. The event holds `auth.result=succe
 Some user fields depend on the app's data model: subscription tier, team, role, organization, account age, A/B test cohort. The package cannot guess them, so the app declares them once, in a service provider:
 
 ```php
-use Phlisg\Jot\Facades\Jot;
+use MarvelousDigital\WideEvents\Facades\Jot;
 
 Jot::user(fn (User $user) => [
     'user.plan' => $user->plan,
@@ -354,7 +354,7 @@ When Laravel reports an exception during a request, job, command or scheduled ta
 - `error.type`: exception class
 - `exception.message`: exception message
 - `error.code`: exception code
-- `error.retriable`: `true` when the exception implements `Phlisg\Jot\Contracts\Retriable`
+- `error.retriable`: `true` when the exception implements `MarvelousDigital\WideEvents\Contracts\Retriable`
 
 Exceptions Laravel does not report, such as validation errors, add nothing.
 
@@ -378,7 +378,7 @@ Jot::keepWhen(fn (array $event) => ($event['user.plan'] ?? null) === 'enterprise
 Every setting lives in `config/jot.php`. The file lists each feature with its default, so the app turns features on or off in one place. Publish it with `php artisan jot:install`.
 
 ```php
-use Phlisg\Jot\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Enums\OutputShape;
 
 return [
 
@@ -484,7 +484,7 @@ Each entry in `outputs` pairs a log channel with a shape. The shape sets the str
 `Jot::fake()` records events instead of writing them. Sampling still applies.
 
 ```php
-use Phlisg\Jot\Facades\Jot;
+use MarvelousDigital\WideEvents\Facades\Jot;
 
 Jot::fake();
 
@@ -502,7 +502,7 @@ Jot::assertEmitted(fn (array $event) => $event['payment.status'] === 'declined')
 
 The package follows semantic versioning and starts at `0.x`. Until `1.0.0`, a minor release (`0.1` to `0.2`) can contain breaking changes. Patch releases (`0.1.0` to `0.1.1`) never do.
 
-- Composer's caret constraint on a `0.x` version stays within one minor release: `composer require phlisg/laravel-jot:^0.1` installs `0.1.*` only.
+- Composer's caret constraint on a `0.x` version stays within one minor release: `composer require marvelous-digital/laravel-wide-events:^0.1` installs `0.1.*` only.
 - `CHANGELOG.md` lists the breaking changes of each minor release.
 
 `1.0.0` comes once the public API (`jot()`, the `Jot` facade, `Section`, `config/jot.php`) is stable.

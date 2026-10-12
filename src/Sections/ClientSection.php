@@ -1,12 +1,12 @@
 <?php
 
-namespace Phlisg\Jot\Sections;
+namespace MarvelousDigital\WideEvents\Sections;
 
 use Illuminate\Http\Request;
+use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ClientAttributes;
 use OpenTelemetry\SemConv\Attributes\UserAgentAttributes;
-use Phlisg\Jot\Attributes\Key;
-use Phlisg\Jot\Section;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final class ClientSection extends Section

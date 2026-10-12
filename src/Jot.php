@@ -1,6 +1,6 @@
 <?php
 
-namespace Phlisg\Jot;
+namespace MarvelousDigital\WideEvents;
 
 use BackedEnum;
 use Closure;
@@ -8,15 +8,15 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use InvalidArgumentException;
-use Phlisg\Jot\Exceptions\JotSectionRequiresInitialisation;
-use Phlisg\Jot\Sections\AppSection;
-use Phlisg\Jot\Sections\ClientSection;
-use Phlisg\Jot\Sections\ErrorSection;
-use Phlisg\Jot\Sections\HttpSection;
-use Phlisg\Jot\Sections\PerformanceSection;
-use Phlisg\Jot\Sections\QuerySection;
-use Phlisg\Jot\Sections\RequestSection;
-use Phlisg\Jot\Sections\UserSection;
+use MarvelousDigital\WideEvents\Exceptions\JotSectionRequiresInitialisation;
+use MarvelousDigital\WideEvents\Sections\AppSection;
+use MarvelousDigital\WideEvents\Sections\ClientSection;
+use MarvelousDigital\WideEvents\Sections\ErrorSection;
+use MarvelousDigital\WideEvents\Sections\HttpSection;
+use MarvelousDigital\WideEvents\Sections\PerformanceSection;
+use MarvelousDigital\WideEvents\Sections\QuerySection;
+use MarvelousDigital\WideEvents\Sections\RequestSection;
+use MarvelousDigital\WideEvents\Sections\UserSection;
 use PHPUnit\Framework\Assert;
 use ReflectionClass;
 use ReflectionException;
