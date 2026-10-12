@@ -520,15 +520,16 @@ php artisan jot:query 4bf92f3577b34da6a3ce929d0e0e4736
 
 ```
 Trace 4bf92f3577b34da6a3ce929d0e0e4736, 2 event(s)
-http  f56220033574661e  POST checkout.store 500  412ms  RuntimeException: Card declined
+http  f56220033574661e  POST checkout.store 200  412ms
 └─ queue  69f6835287391bf7  ChargeCard failed  10ms  RuntimeException: Card network timeout
 ```
 
-- A trace ID (32 hex characters) prints the whole trace. The `X-Request-Id` response header holds it.
-- A span ID (16 hex characters) prints the same tree, then every field of that event.
-- `--days=7`: how many days of files to read. `--json`: one JSON line per event.
+- Trace ID (32 hex characters): prints the whole trace. The `X-Request-Id` response header holds it.
+- Span ID (16 hex characters): prints the same tree, then every field of that event.
+- `--days=7`: how many days of files to read.
+- `--json`: one JSON line per event.
 
-`jot:query` reads the outputs that write files, `single` and `daily` channels. For the other outputs, such as `stderr` or Sentry Logs, it prints where else to look.
+`jot:query` reads only outputs on a `single` or `daily` channel, the ones that write files. For any other output, such as `stderr` or Sentry Logs, it prints where else to look.
 
 ## Sentry and GlitchTip
 
@@ -538,26 +539,6 @@ With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works w
 - With Sentry Logs on, each event also goes to Sentry Logs, with every field as a searchable attribute.
 
 GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs. Marvelous Digital's instance: https://glitchtip.marvelous.digital/.
-
-### During a failure
-
-Sentry and Jot split the work when the app throws:
-
-| | Sentry or GlitchTip | Jot |
-|---|---|---|
-| What | one issue per exception, grouped | one wide event per request, job or command |
-| Holds | stack trace, breadcrumbs, release | user, route, business fields, timings, queries, every job in the trace |
-| Created by | the SDK, when Laravel reports the exception | Jot, which adds `error.*` to the event of the unit of work |
-
-What happens:
-
-1. The SDK creates the issue. Jot creates none, since a second issue would duplicate it.
-2. Jot adds `error.type` and `exception.message` to the event. The event gets the level `error`, and sampling always keeps it.
-3. The issue carries the tags `trace_id` and `span_id`, and a "Jot" context with the command to run.
-
-From an issue to its events: run the command shown in the issue's "Jot" context, `php artisan jot:query <trace_id>`, see "Finding events" above. With a log backend, set `JOT_SENTRY_LINK` to a search URL, for example `https://grafana.example.com/explore?query={trace_id}`, and the context shows a link instead of a command to type.
-
-From a user report to the issue: the `X-Request-Id` response header holds the `trace_id`. In Sentry, search the issues for `trace_id:<id>`.
 
 To turn Sentry Logs on, set in `.env`:
 
@@ -581,7 +562,23 @@ Each event gets a log level, from its fields:
 
 > The SDK's own `SENTRY_LOG_LEVEL` (default: `LOG_LEVEL`) filters the same channel for every log line of the app. Keep it at or below `JOT_SENTRY_LEVEL`.
 
-> Jot creates no Sentry issues. The SDK already reports each exception, and a second issue would duplicate it.
+### During a failure
+
+When the app throws, Sentry and Jot each record a part:
+
+| | Sentry or GlitchTip | Jot |
+|---|---|---|
+| Record | one issue per exception, grouped | one wide event per request, job or command |
+| Holds | stack trace, breadcrumbs (what the app did before the error), release | user, route, business fields, timings, queries, every job in the trace |
+| Written by | the SDK, when Laravel reports the exception | Jot, which adds `error.*` to the current event |
+
+1. The SDK creates the issue. Jot creates none, to avoid a duplicate.
+2. Jot adds `error.type` and `exception.message` to the event. The event gets the level `error`, and sampling always keeps it.
+3. The issue gets the tags `trace_id` and `span_id`, and a "Jot" context that shows `php artisan jot:query <trace_id>`.
+
+From an issue to its events: run that command, see "Finding events" above. With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
+
+From a user report to the issue: the `X-Request-Id` response header holds the `trace_id`. In Sentry, search the issues for `trace_id:<id>`.
 
 ## Output shapes
 
