@@ -86,6 +86,15 @@ Scheduler:
 1. On `ScheduledTaskStarting`, Jot starts an accumulator with `entrypoint=schedule`, `schedule.task` and `schedule.expression`.
 2. On `ScheduledTaskFinished` or `ScheduledTaskFailed`, Jot adds `schedule.exit_code`, then emits.
 
+Livewire:
+
+1. Each component action is a `POST` to the `livewire.update` route, so it gets an HTTP event like any request.
+2. `Lifecycle` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` only on that route. The same hooks fire on the first page load, which stays a plain HTTP event.
+3. A listener must return nothing. Livewire calls back any returned closure when the request ends.
+4. Livewire answers a failed validation with a 200 and never reports it. The `exception` hook still sees it, which gives `livewire.validation_*`.
+
+The hooks are public (`Livewire::listen()`) but undocumented. Livewire 3 and 4 call them with the same first arguments, and Livewire 4 adds `$metadata` to `call`, which marks a `wire:poll`.
+
 ## The stack
 
 A sync job, `dispatchAfterResponse()` or `Artisan::call()` runs inside the current process. `Lifecycle` keeps a stack:

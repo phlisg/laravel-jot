@@ -132,6 +132,19 @@ class Jot
         return $this->reserved[$class] ?? null;
     }
 
+    /**
+     * The built-in section of that class, or the given one when there is none yet.
+     *
+     * @template T of Section
+     *
+     * @param  T  $section
+     * @return T
+     */
+    public function reserve(Section $section): Section
+    {
+        return $this->reserved[$section::class] ??= $section;
+    }
+
     public function traceId(): ?string
     {
         return $this->builtIn(RequestSection::class)?->traceId;

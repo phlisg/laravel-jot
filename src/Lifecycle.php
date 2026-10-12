@@ -23,10 +23,14 @@ use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use MarvelousDigital\WideEvents\Sections\ConsoleSection;
 use MarvelousDigital\WideEvents\Sections\JobSection;
+use MarvelousDigital\WideEvents\Sections\LivewireSection;
 use MarvelousDigital\WideEvents\Sections\PerformanceSection;
 use MarvelousDigital\WideEvents\Sections\RequestSection;
 use MarvelousDigital\WideEvents\Sections\ScheduleSection;
@@ -79,6 +83,7 @@ class Lifecycle
         }
 
         $this->registerPerformance($events);
+        $this->registerLivewire();
 
         // A command that throws never fires CommandFinished.
         app()->terminating(function () {
@@ -114,6 +119,94 @@ class Lifecycle
 
         if ($on('queue')) {
             $events->listen(JobQueued::class, fn () => $this->performance(fn (PerformanceSection $p) => $p->queueDispatched++));
+        }
+    }
+
+    /**
+     * Each listener returns nothing: Livewire calls back a listener's return value when the request ends.
+     */
+    protected function registerLivewire(): void
+    {
+        if (! app()->bound('livewire') || ! config('jot.fields.livewire', true)) {
+            return;
+        }
+
+        Livewire::listen('hydrate', function ($component, $memo) {
+            $this->livewire(function (LivewireSection $livewire) use ($component, $memo) {
+                $livewire->page ??= $memo['path'] ?? null;
+                $livewire->remember('components', $component->getName());
+            });
+        });
+
+        Livewire::listen('update', function ($component, $path) {
+            $this->livewire(fn (LivewireSection $livewire) => $livewire->remember('updates', $path));
+        });
+
+        // $metadata: Livewire 4 only.
+        Livewire::listen('call', function ($component, $method, $params, $context, $returnEarly, $metadata = []) {
+            $this->livewire(fn (LivewireSection $livewire) => $this->call($livewire, $component, $method, $params, $metadata));
+        });
+
+        Livewire::listen('exception', function ($component, $e) {
+            if ($e instanceof ValidationException) {
+                $this->livewire(function (LivewireSection $livewire) use ($e) {
+                    $livewire->validationFailed = true;
+                    array_map(fn ($field) => $livewire->remember('validationFields', (string) $field), array_keys($e->errors()));
+                });
+            }
+        });
+    }
+
+    protected function call(LivewireSection $livewire, object $component, string $method, array $params, array $metadata): void
+    {
+        if (($metadata['type'] ?? null) === 'poll') {
+            $livewire->poll = true;
+        }
+
+        match ($method) {
+            '__dispatch' => $livewire->remember('events', (string) ($params[0] ?? '')),
+            '__lazyLoad' => $livewire->lazy = true,
+            default => null,
+        };
+
+        // Livewire internals, such as uploads, and Livewire 4 magic actions, such as $refresh.
+        if (str_starts_with($method, '_') || str_starts_with($method, '$')) {
+            return;
+        }
+
+        $livewire->remember('calls', $component->getName().'::'.$method);
+        $livewire->filamentAction = $this->filamentAction($component, $method, $params) ?? $livewire->filamentAction;
+    }
+
+    protected function filamentAction(object $component, string $method, array $params): ?string
+    {
+        // mountAction(name), mountTableAction(name), mountFormComponentAction(component, name)...
+        if (str_starts_with($method, 'mount') && str_ends_with($method, 'Action')) {
+            $name = $params[$method === 'mountFormComponentAction' ? 1 : 0] ?? null;
+
+            return is_string($name) ? $name : null;
+        }
+
+        // callMountedAction() reads $mountedActions: names in Filament 3, ['name' => ...] in Filament 4.
+        if (str_starts_with($method, 'callMounted')) {
+            $list = lcfirst(substr($method, 4)).'s';
+            $action = property_exists($component, $list) ? Arr::last((array) $component->{$list}) : null;
+            $name = is_array($action) ? ($action['name'] ?? null) : $action;
+
+            return is_string($name) ? $name : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  Closure(LivewireSection): mixed  $change
+     */
+    protected function livewire(Closure $change): void
+    {
+        // Update requests only: the exception hook also fires on the first page load.
+        if (jot()->traceId() && Str::endsWith((string) request()->route()?->getName(), 'livewire.update')) {
+            $change(jot()->reserve(new LivewireSection));
         }
     }
 

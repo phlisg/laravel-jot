@@ -24,6 +24,7 @@
     "require-dev": {
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.14",
+        "livewire/livewire": "^3.6",
         "nunomaduro/collision": "^8.8",
         "orchestra/testbench": "^11.0.0||^10.0.0||^9.0.0",
         "pestphp/pest": "^4.0",
@@ -36,6 +37,7 @@
         "spatie/laravel-ray": "^1.35"
     },
     "suggest": {
+        "livewire/livewire": "Adds the components, calls and validation errors of each Livewire update to the event",
         "sentry/sentry-laravel": "Tags Sentry issues with the request ID and sends events to Sentry Logs"
     },
     "autoload": {

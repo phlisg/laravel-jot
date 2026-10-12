@@ -54,6 +54,8 @@ return [
         'locale' => true,
         'app' => true,
         'errors' => true,
+        // Components, calls and validation errors of Livewire update requests, when Livewire is installed.
+        'livewire' => true,
 
         'performance' => [
             'memory' => true,
