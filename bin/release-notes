@@ -1,0 +1,28 @@
+#!/bin/sh
+# Usage: bin/release-notes <tag>   prints the release notes of <tag> as Markdown
+#   Run it before tagging to preview: bin/release-notes HEAD
+# Notes: the CHANGELOG.md section of the version, then the Conventional Commits since the previous tag.
+set -e
+cd "$(dirname "$0")/.."
+
+tag=${1:?Usage: bin/release-notes <tag>}
+previous=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+range=${previous:+$previous..}$tag
+
+awk -v version="${tag#v}" '/^## / { keep = ($2 == version); next } keep' CHANGELOG.md
+
+# Prints the subjects of one commit type, without the type prefix.
+commits() {
+    git log --no-merges --format=%s "$range" | sed -nE "s/^($1)(\([^)]*\))?$2: /- /p"
+}
+
+section() {
+    if [ -n "$2" ]; then printf '\n### %s\n\n%s\n' "$1" "$2"; fi
+}
+
+section 'Breaking changes' "$(commits '[a-z]+' '!')"
+section 'Features' "$(commits feat '')"
+section 'Fixes' "$(commits fix '')"
+section 'Documentation' "$(commits docs '')"
+
+if [ -n "$previous" ]; then printf '\nFull diff: %s...%s\n' "$previous" "$tag"; fi
