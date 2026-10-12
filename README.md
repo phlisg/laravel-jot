@@ -35,20 +35,21 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 
 ## Requirements
 
-- PHP 8.3
-- Laravel 11 or later, which provides the `Context` facade (the Laravel feature that shares data across a request and its queued jobs)
+- PHP 8.3 or later
+- Laravel 11, 12 or 13. Jot relies on the `Context` facade, added in Laravel 11, which shares data across a request and its queued jobs.
 
 ## Features
 
 - Zero setup: install the package and every request, job, command and scheduled task writes a wide event.
 - `jot()` global helper, with a `Jot` facade as a fallback.
-- Request ID and trace ID on every request, propagated to queued jobs through Laravel Context.
+- Trace ID on every event, shared by a request and the jobs and commands it starts, in W3C Trace Context format.
 - Automatic fields: user, hashed session, login outcome, HTTP details, errors, duration, database usage.
 - Typed section classes that define the log schema.
 - Backed enums for fields with a fixed set of values.
 - Tail sampling: keep every error and slow request, sample the rest.
 - Strict mode that warns on fields outside the schema.
 - Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
+- `jot:query`: finds every event of a trace in the log files.
 
 ## Installation
 
@@ -278,12 +279,12 @@ Always on:
 - `trace_id`: shared by every event in the chain, so one query finds a request and every job and command it started. New for each request, unless a trusted `traceparent` header brings one. The `X-Request-Id` response header returns it.
 - `span_id`: this event's own ID.
 - `parent_span_id`: the `span_id` of the request, job or command that started this one. Absent on the first event of a trace.
-
-The IDs follow W3C Trace Context: 32 hex characters for `trace_id`, 16 for the span IDs.
 - `timestamp`: start time, in ISO 8601 format.
 - `entrypoint`: where the unit of work entered the app: `http`, `queue`, `console` or `schedule`.
 - `origin`: the `entrypoint` of the first event in the trace. A job dispatched by a scheduled task has `entrypoint=queue` and `origin=schedule`.
 - `duration_ms`: time from start to emit.
+
+The IDs follow W3C Trace Context: 32 hex characters for `trace_id`, 16 for the span IDs.
 
 By group:
 
@@ -375,7 +376,7 @@ $payment->status = PaymentStatus::Approved;
 
 Each request adds what it knows, usually from the route. To follow one user through the funnel, query the log backend on `booking.event_id` plus `session.hash` or `user.id`.
 
-> The Stripe webhook comes from Stripe's servers, so it has no session and no user. Store the `trace_id` in the payment intent `metadata`, and add it back in the webhook handler to link both events.
+> The Stripe webhook comes from Stripe's servers, so it has no session and no user. Store the `trace_id` in the payment intent `metadata`. In the webhook handler, add it as `payment.trace_id`: the webhook event has its own `trace_id`, and automatic fields always win.
 
 ## Errors
 
@@ -485,9 +486,6 @@ return [
             'http_client' => true,
             'queue' => true,
         ],
-
-        // Ignored when laravel/pennant is not installed.
-        'pennant' => true,
     ],
 
     'queue' => [
@@ -571,7 +569,7 @@ Each event gets a log level, from its fields:
 | `notice` | slower than `sampling.slow_ms` |
 | `info` | every other event |
 
-`JOT_SENTRY_LEVEL` sets the lowest level that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off both the logs and the tags.
+`JOT_SENTRY_LEVEL` sets the lowest level that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off the logs, the tags and the "Jot" context.
 
 > Only sampled events reach Sentry, see [Sampling](#sampling).
 

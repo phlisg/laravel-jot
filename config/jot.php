@@ -62,9 +62,6 @@ return [
             'http_client' => true,
             'queue' => true,
         ],
-
-        // Ignored when laravel/pennant is not installed.
-        'pennant' => true,
     ],
 
     'queue' => [
