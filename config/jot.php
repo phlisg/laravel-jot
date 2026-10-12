@@ -9,7 +9,15 @@ return [
     // One entry per destination. Each output writes the same event in its own shape.
     'outputs' => [
         // channel null: a daily file in storage/logs with one JSON object per line.
+        // level: optional, the lowest event level this output writes.
         ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
+    ],
+
+    // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
+    // Events below this level stay out of Sentry: error, warning, notice or info.
+    'sentry' => [
+        'enabled' => env('JOT_SENTRY', true),
+        'level' => env('JOT_SENTRY_LEVEL', 'info'),
     ],
 
     'request_id' => [

@@ -32,7 +32,11 @@
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
+        "sentry/sentry-laravel": "^4.20",
         "spatie/laravel-ray": "^1.35"
+    },
+    "suggest": {
+        "sentry/sentry-laravel": "Tags Sentry issues with the request ID and sends events to Sentry Logs"
     },
     "autoload": {
         "psr-4": {

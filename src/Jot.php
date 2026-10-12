@@ -57,7 +57,7 @@ class Jot
     }
 
     /**
-     * Starts any event. Only the IDs go to Context, see "Request lifecycle" in the README.
+     * Starts any event. Only the IDs go to Context, see "Context" in docs/architecture.md.
      */
     public function start(RequestSection $ids, ?Section ...$sections): static
     {
@@ -76,11 +76,14 @@ class Jot
 
         $this->startedAt = hrtime(true);
 
-        Context::add(array_filter([
-            'request_id' => $ids->id,
-            'trace_id' => $ids->traceId,
-            'origin' => $ids->origin,
-        ]));
+        $tags = array_filter(['request_id' => $ids->id, 'trace_id' => $ids->traceId]);
+
+        Context::add($tags + ['origin' => $ids->origin]);
+
+        // Links each Sentry issue to its wide event.
+        if (config('jot.sentry.enabled', true) && app()->bound('sentry')) {
+            \Sentry\configureScope(fn ($scope) => $scope->setTags($tags));
+        }
 
         return $this;
     }
