@@ -2,6 +2,28 @@
 
 Laravel Wide Events writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
 
+## Contents
+
+- [Why](#why)
+- [Requirements](#requirements)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Sections](#sections)
+- [Loose fields](#loose-fields)
+- [Field conventions](#field-conventions)
+- [Automatic fields](#automatic-fields)
+- [Example: paid event booking](#example-paid-event-booking)
+- [Errors](#errors)
+- [Sampling](#sampling)
+- [Configuration](#configuration)
+- [Sentry and GlitchTip](#sentry-and-glitchtip)
+- [Output shapes](#output-shapes)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Versioning](#versioning)
+- [Contributing](#contributing)
+
 ## Why
 
 Classic logs scatter many short lines across a request. Finding everything about one failed checkout means searching for strings and stitching lines together by hand.
@@ -25,12 +47,15 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 - Backed enums for fields with a fixed set of values.
 - Tail sampling: keep every error and slow request, sample the rest.
 - Strict mode that warns on fields outside the schema.
+- Sentry and GlitchTip: issues tagged with the request ID, events in Sentry Logs.
 
 ## Installation
 
 ```sh
 composer require marvelous-digital/laravel-wide-events
 ```
+
+The repository is private: add it to the app's Composer `repositories` first, see "Install from another project" in `docs/development.md`.
 
 Nothing else is required. The package registers its helper, service provider, global middleware and event listeners itself, and its defaults apply until the app publishes `config/jot.php`.
 
@@ -40,7 +65,9 @@ To change a default, publish the config file. It lists every feature with its de
 php artisan jot:install
 ```
 
-`php artisan vendor:publish --tag=jot-config` does the same.
+`jot:install` also runs `php artisan jot:env`, which adds the Jot keys missing from `.env.example` and `.env`, with their default values. It keeps existing keys, including commented-out ones, so it is safe to run again after an upgrade.
+
+`php artisan vendor:publish --tag=jot-config` publishes the config file alone.
 
 ## Usage
 
@@ -387,7 +414,15 @@ return [
     // One entry per destination. Each output writes the same event in its own shape.
     'outputs' => [
         // channel null: a daily file in storage/logs with one JSON object per line.
+        // level: optional, the lowest event level this output writes.
         ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
+    ],
+
+    // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
+    // Events below this level stay out of Sentry: error, warning, notice or info.
+    'sentry' => [
+        'enabled' => env('JOT_SENTRY', true),
+        'level' => env('JOT_SENTRY_LEVEL', 'info'),
     ],
 
     'request_id' => [
@@ -462,12 +497,45 @@ return [
 
 Settings that need a decision per app:
 
-- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see "Output shapes" below. The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field.
+- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see "Output shapes" below. The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see "Sentry and GlitchTip" below for the levels.
 - `request_id.trust_incoming`: off by default, so that clients cannot choose their own request ID or trace ID. Turn it on behind a proxy or load balancer that sets the header. A trusted W3C `traceparent` header also sets the `trace_id`.
 - `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
 - `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
 - `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
 - `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%.
+
+## Sentry and GlitchTip
+
+With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works with Sentry and needs no setup:
+
+- Every Sentry issue gets the tags `request_id` and `trace_id`, which point to its wide event in the logs.
+- With Sentry Logs on, each event also goes to Sentry Logs, with every field as a searchable attribute.
+
+GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs.
+
+To turn Sentry Logs on, set in `.env`:
+
+```sh
+SENTRY_ENABLE_LOGS=true
+JOT_SENTRY_LEVEL=warning
+```
+
+Each event gets a log level, from its fields:
+
+| Level | Events |
+|---|---|
+| `error` | an `error.type`, a status of 500 or more, a failed job |
+| `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
+| `notice` | slower than `sampling.slow_ms` |
+| `info` | every other event |
+
+`JOT_SENTRY_LEVEL` sets the lowest level that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off both the logs and the tags.
+
+> Only sampled events reach Sentry, see "Sampling" above.
+
+> The SDK's own `SENTRY_LOG_LEVEL` (default: `LOG_LEVEL`) filters the same channel for every log line of the app. Keep it at or below `JOT_SENTRY_LEVEL`.
+
+> Jot creates no Sentry issues. The SDK already reports each exception, and a second issue would duplicate it.
 
 ## Output shapes
 
@@ -507,7 +575,9 @@ The package follows semantic versioning and starts at `0.x`. Until `1.0.0`, a mi
 
 `1.0.0` comes once the public API (`jot()`, the `Jot` facade, `Section`, `config/jot.php`) is stable.
 
+Release steps, and how to install a version from another project: see "Releases" in `docs/development.md`.
+
 ## Contributing
 
 - `docs/architecture.md`: how the package collects and writes events, request and job lifecycle, open questions.
-- `docs/development.md`: Docker setup, tests, static analysis, PHP versions, and the workbench app that runs demo scenarios.
+- `docs/development.md`: Docker setup, tests, static analysis, PHP versions, the workbench app that runs demo scenarios, and releases.

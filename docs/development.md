@@ -120,3 +120,39 @@ tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).
 | Structural rule across the package | `tests/ArchTest.php` |
 
 `tests/ArchTest.php` forbids `dd`, `dump` and `ray` in the code it scans.
+
+## Releases
+
+Versions come from git tags, `v` plus a semantic version, for example `v0.1.0`. Composer reads them directly, so `composer.json` holds no `version` field. The `release` workflow (`.github/workflows/release.yml`) runs the test suite on each pushed tag, then creates the GitHub release.
+
+1. Start the release from `develop`: `git flow release start 0.1.0`.
+2. Preview the notes: `bin/release-notes HEAD`.
+3. Optional: add a `## 0.1.0` section to `CHANGELOG.md` for what commit subjects cannot say, such as how to upgrade past a breaking change. Commit it.
+4. Finish: `git flow release finish 0.1.0`. git-flow merges into `master` and `develop`, and tags `v0.1.0`.
+5. Push: `git push origin master develop && git push --tags`.
+
+`bin/release-notes` writes the notes: the `CHANGELOG.md` section of the version, then the commit subjects since the previous tag, grouped by Conventional Commits type:
+
+- `feat!:`, `fix!:` and any type with `!`: "Breaking changes"
+- `feat:`: "Features"
+- `fix:`: "Fixes"
+- `docs:`: "Documentation"
+
+Other types, such as `build:`, `test:` or `style:`, stay out of the notes. A commit subject is a line in the release notes, so write it for the people who install the package.
+
+> Until `1.0.0`, bump the minor version (`0.1` to `0.2`) for a breaking change and the patch version for anything else, see "Versioning" in the README.
+
+### Install from another project
+
+The repository is private, so Composer reads it from GitHub directly, with the GitHub token in the project's `auth.json`. In the other project's `composer.json`:
+
+```json
+"repositories": [
+    { "type": "vcs", "url": "git@github.com:Marvelous-Digital/laravel-wide-events.git" }
+]
+```
+
+Then:
+
+- A release: `composer require marvelous-digital/laravel-wide-events:^0.1`
+- The latest `develop`, before any tag: `composer require marvelous-digital/laravel-wide-events:dev-develop`
