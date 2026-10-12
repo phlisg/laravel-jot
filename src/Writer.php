@@ -79,7 +79,8 @@ class Writer
      */
     public function outputs(): array
     {
-        $outputs = config('jot.outputs', []);
+        // An empty JOT_CHANNEL= in .env reads as "", which Log::channel() takes for the app's default channel.
+        $outputs = array_map(fn (array $output) => ['channel' => ($output['channel'] ?? null) ?: null] + $output, config('jot.outputs', []));
 
         $sentry = config('jot.sentry.enabled', true)
             && app()->bound('sentry')

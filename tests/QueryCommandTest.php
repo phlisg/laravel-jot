@@ -4,6 +4,7 @@ namespace MarvelousDigital\WideEvents\Tests;
 
 use Illuminate\Support\Facades\Route;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Writer;
 
 /**
  * @return array{string, string} the trace ID, and the span ID of the job
@@ -66,4 +67,10 @@ it('names the outputs it cannot read', function () {
     $this->artisan('jot:query', ['id' => str_repeat('0', 32)])
         ->expectsOutputToContain('Also written to the stderr channel')
         ->assertFailed();
+});
+
+it('reads an empty channel as the default Jot file', function () {
+    config(['jot.outputs' => [['channel' => '']]]);
+
+    expect(app(Writer::class)->outputs())->toBe([['channel' => null]]);
 });
