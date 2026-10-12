@@ -6,7 +6,9 @@ use Closure;
 use Illuminate\Support\Facades\Log;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use Monolog\Formatter\JsonFormatter;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
+use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
@@ -129,10 +131,9 @@ class Writer
             return Log::channel($channel);
         }
 
-        return $this->defaultChannel ??= Log::build([
-            'driver' => 'daily',
-            'path' => storage_path('logs/jot.log'),
-            'formatter' => JsonFormatter::class,
+        // A plain Monolog logger: Laravel's channels append Context to "extra", which repeats the event's IDs.
+        return $this->defaultChannel ??= new Logger('jot', [
+            (new RotatingFileHandler(storage_path('logs/jot.log'), 7))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
         ]);
     }
 }

@@ -294,6 +294,21 @@ it('writes to the configured channel', function () {
     expect(file_get_contents($path))->toContain('jot')->toContain('"url.path":"/"');
 });
 
+it('writes the IDs once in the default file', function () {
+    $path = storage_path('logs/jot-'.date('Y-m-d').'.log');
+    @unlink($path);
+    app(Writer::class)->faked = null;
+    config(['jot.outputs' => [['channel' => null]]]);
+    Route::get('/', fn () => 'ok');
+
+    $this->get('/');
+
+    $line = json_decode(file_get_contents($path), true);
+
+    expect($line['context'])->toHaveKey('trace_id')
+        ->and($line)->not->toHaveKey('extra');
+});
+
 it('writes a scheduled task', function () {
     $task = app(Schedule::class)->call(fn () => null)->hourly()->description('reports:send');
 
