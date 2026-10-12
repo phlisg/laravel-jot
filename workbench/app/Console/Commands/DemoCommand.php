@@ -25,6 +25,7 @@ class DemoCommand extends Command
         'login' => 'Login with the right password',
         'login-failed' => 'Login with a wrong password',
         'error' => 'An exception, answered with a 500',
+        'query' => 'jot:query on the trace of a failed job, then on the job span',
     ];
 
     /** @var array<string, string> */
@@ -51,7 +52,10 @@ class DemoCommand extends Command
 
             $this->{'run'.Str::studly($name)}();
 
-            $this->printEvents($log, $offset);
+            // jot:query prints the events itself.
+            if ($name !== 'query') {
+                $this->printEvents($log, $offset);
+            }
         }
 
         $this->line("Log file: $log");
@@ -73,8 +77,8 @@ class DemoCommand extends Command
     protected function runJobFailed(): void
     {
         $this->send('POST', '/jobs/failing');
-        Artisan::call('queue:work', ['connection' => 'database', '--once' => true]);
-        $this->line('queue:work --once');
+        Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true]);
+        $this->line('queue:work --stop-when-empty');
     }
 
     protected function runJobSync(): void
@@ -95,6 +99,23 @@ class DemoCommand extends Command
     protected function runError(): void
     {
         $this->send('GET', '/boom');
+    }
+
+    protected function runQuery(): void
+    {
+        $trace = $this->send('POST', '/jobs/failing')->headers->get('X-Request-Id');
+        Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true]);
+
+        $this->line("jot:query {$trace}");
+        $this->call('jot:query', ['id' => $trace]);
+
+        $job = collect(file(storage_path('logs/jot-'.date('Y-m-d').'.log')))
+            ->map(fn ($line) => json_decode($line, true)['context'])
+            ->last(fn ($event) => $event['trace_id'] === $trace && $event['entrypoint'] === 'queue');
+
+        $this->newLine();
+        $this->line("jot:query {$job['span_id']}");
+        $this->call('jot:query', ['id' => $job['span_id']]);
     }
 
     /**

@@ -77,11 +77,12 @@ It creates an SQLite database, runs the Laravel default migrations (users, cache
 | Scenario | What it shows |
 |---|---|
 | `booking` | The four requests of "Example: paid event booking" in the README, with a `PaymentLog` section and enums |
-| `job-failed` | A request queues a job, `queue:work --once` runs it, the job fails |
+| `job-failed` | A request queues a job, `queue:work --stop-when-empty` runs it, the job fails |
 | `job-sync` | A sync job inside a request: `parent_span_id` and `trace_id` point to the request |
 | `login` | `auth.result=success` and `user.id` |
 | `login-failed` | `auth.result=failed`, no `user.id` |
 | `error` | An exception, answered with a 500 |
+| `query` | `jot:query` on the trace of a failed job, then on the job's span |
 
 ### Server
 
