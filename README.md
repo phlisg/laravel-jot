@@ -247,14 +247,39 @@ The fields the package adds itself, listed in [Automatic fields](#automatic-fiel
 
 ## Loose fields
 
-A one-off field with no section uses `add` with a string or a backed enum key:
+A loose field is a field added with a string or enum key, outside any section. The app has three ways to add a field, from the quickest to the safest:
 
 ```php
-jot()->add('feature.new_checkout', true);
-jot()->add(Field::ExperimentVariant, 'b');
+jot()->add('feature.new_checkout', true);       // string key
+jot()->add(Field::ExperimentVariant, 'b');      // backed enum key
+jot(ExperimentLog::class)->variant = 'b';        // section property, see Sections
 ```
 
-Strict mode is off by default. With strict mode on, the package still writes string keys, and logs a warning for each one on the app's default log channel. Enum keys and sections never trigger the warning.
+| Key | Use it for | Risk |
+|---|---|---|
+| String | a one-off field, a field added while debugging, a short experiment | a typo creates a new field, and nothing stops `'42'` in one place and `42` in another |
+| Backed enum | fields used in many places with no natural group, such as feature flags or experiments | the enum fixes the name, the value type stays free |
+| Section | a group of related fields, such as a payment | none: typed properties fix both the name and the type |
+
+A backed enum key is any string-backed enum the app declares, one case per field:
+
+```php
+enum Field: string
+{
+    case ExperimentVariant = 'experiment.variant';
+    case NewCheckout = 'feature.new_checkout';
+}
+```
+
+String keys cost nothing to add, so they spread. Each one is a field name that lives only in the code that writes it, and a wrong type on one of them breaks queries on that field, see [Field conventions](#field-conventions).
+
+Strict mode finds them. With `JOT_STRICT=true`, the package still writes every string key, and logs a warning for each one on the app's default log channel:
+
+```
+[jot] String key "feature.new_checkout" written; declare it in an enum or a section.
+```
+
+Enum keys and sections never trigger the warning. Turn strict mode on in local and CI environments to catch string keys before they reach production, and keep it off in production, where the warnings would only add noise.
 
 ## Field conventions
 
