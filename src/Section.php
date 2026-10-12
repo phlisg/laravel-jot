@@ -27,11 +27,6 @@ abstract class Section
 
     protected static ?string $prefix = null;
 
-    public static function __callStatic(string $name, array $arguments)
-    {
-        return (new static)->{$name}(...$arguments);
-    }
-
     final public function toDotNotation(): array
     {
         return static::flattenSection($this, static::prefix());
