@@ -22,6 +22,7 @@ use MarvelousDigital\WideEvents\Contracts\Retriable;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Writer;
+use LogicException;
 use RuntimeException;
 
 class RetriableException extends RuntimeException implements Retriable {}
@@ -93,7 +94,19 @@ describe('http', function () {
 
         $this->get('/sync')->assertOk();
 
-        expect(emittedBy('http'))->toMatchArray(['error.type' => RuntimeException::class, 'exception.message' => 'CRM down']);
+        expect(emittedBy('http'))->toMatchArray(['error.type' => RuntimeException::class, 'exception.message' => 'CRM down', 'error.count' => 1]);
+    });
+
+    it('keeps the last reported exception, and counts them', function () {
+        Route::get('/sync', function () {
+            report(new RuntimeException('CRM down'));
+
+            throw new LogicException('broken');
+        });
+
+        $this->get('/sync')->assertServerError();
+
+        expect(emittedBy('http'))->toMatchArray(['error.type' => LogicException::class, 'error.count' => 2]);
     });
 
     it('writes one event at the end of the request', function () {
@@ -183,7 +196,7 @@ describe('queue', function () {
         } catch (RuntimeException) {
         }
 
-        expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class]);
+        expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class, 'error.count' => 1]);
     });
 });
 
@@ -291,7 +304,7 @@ it('keeps the error of a job the worker fails', function () {
     event(new JobProcessing('redis', $job));
     event(new JobFailed('redis', $job, new RuntimeException('import broke')));
 
-    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class]);
+    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class, 'error.count' => 1]);
 });
 
 describe('ids across units of work', function () {

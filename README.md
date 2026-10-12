@@ -385,8 +385,23 @@ When Laravel reports an exception during a request, job, command or scheduled ta
 - `exception.message`: exception message
 - `error.code`: exception code
 - `error.retriable`: `true` when the exception implements `MarvelousDigital\WideEvents\Contracts\Retriable`
+- `error.count`: how many exceptions were reported during the event
 
-Exceptions Laravel does not report, such as validation errors, add nothing.
+A caught exception reaches the event through `report()`:
+
+```php
+try {
+    $crm->sync($user);
+} catch (CrmException $e) {
+    report($e);           // a Sentry issue, and error.* on the event
+    // or jot()->error($e); // error.* on the event only, no Sentry issue
+}
+```
+
+- `rescue(fn () => ...)` reports too.
+- With several exceptions, `error.*` describes the last one, usually the one that ended the request. `error.count` shows the others exist, and Sentry holds each of them, see "During a failure" below.
+- An event with `error.type` gets the level `error`, even with a 200 response: `report()` means the exception needs attention. Sampling always keeps it.
+- Exceptions Laravel does not report, such as validation errors and 404s, add nothing.
 
 ## Sampling
 

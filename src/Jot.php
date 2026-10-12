@@ -139,8 +139,11 @@ class Jot
 
     public function error(Throwable $e): static
     {
-        if (config('jot.fields.errors', true)) {
-            $this->reserved[ErrorSection::class] = new ErrorSection($e);
+        $previous = $this->builtIn(ErrorSection::class);
+
+        // The queue listeners and the exception handler can each record the same exception.
+        if (config('jot.fields.errors', true) && $previous?->exception !== $e) {
+            $this->reserved[ErrorSection::class] = new ErrorSection($e, ($previous->count ?? 0) + 1);
         }
 
         return $this;
