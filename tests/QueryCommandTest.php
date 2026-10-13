@@ -330,6 +330,22 @@ it('follows new lines, and the next daily file whole', function () {
     unlink($yesterday);
 });
 
+it('follows a file that appears after the start', function () {
+    $today = storage_path('logs/jot-query-'.now()->format('Y-m-d').'.log');
+    @unlink($today);
+    config(['logging.channels.query' => ['driver' => 'daily', 'path' => storage_path('logs/jot-query.log')]]);
+
+    FollowedQueryCommand::$polls = [fn () => logged('first')];
+    $command = app(FollowedQueryCommand::class);
+    $command->setLaravel(app());
+    $output = new BufferedOutput;
+
+    expect(fn () => $command->run(new ArrayInput(['--follow' => true]), $output))->toThrow(LogicException::class, 'stop following')
+        ->and($output->fetch())->toContain('GET first');
+
+    unlink($today);
+});
+
 it('prints JSON lines instead of the table at a terminal', function () {
     atTerminal();
     logged('home', ['span_id' => 'aaaabbbbccccdddd']);

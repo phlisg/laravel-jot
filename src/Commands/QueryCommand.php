@@ -303,6 +303,7 @@ class QueryCommand extends Command
     {
         $file = null;
         $offset = 0;
+        $started = false;
 
         while (true) {
             clearstatcache();
@@ -310,9 +311,11 @@ class QueryCommand extends Command
 
             if ($newest !== $file) {
                 // At start, skip what is printed already; a file that appears later, after the daily rollover, is read whole.
-                $offset = $file === null && $newest !== null ? (int) filesize($newest) : 0;
+                $offset = ! $started && $newest !== null ? (int) filesize($newest) : 0;
                 $file = $newest;
             }
+
+            $started = true;
 
             if ($file !== null && ($handle = @fopen($file, 'r')) !== false) {
                 $offset = min($offset, (int) filesize($file));
