@@ -144,15 +144,15 @@ The prefix is the class name in snake case, without a `Log` or `Section` suffix:
 protected static ?string $prefix = 'payment';
 ```
 
-`jot(PaymentLog::class)` returns the same instance for the whole request, so any class can fill it:
+`PaymentLog::current()` returns the same instance for the whole request, so any class can fill it. Its return type is `PaymentLog`, so the IDE autocompletes the properties and PHPStan checks them. `jot(PaymentLog::class)` returns the same instance too, and suits a class name known only at runtime: `jot($sectionClass)`.
 
 ```php
-$payment = jot(PaymentLog::class);
+$payment = PaymentLog::current();
 $payment->provider = PaymentProvider::Stripe;
 $payment->attempts++;
 
 // Later, in another class, during the same request
-jot(PaymentLog::class)->status = PaymentStatus::Declined;
+PaymentLog::current()->status = PaymentStatus::Declined;
 ```
 
 The section adds these fields to the event, next to the [automatic fields](#automatic-fields). `intentId` and `latencyMs` are `null`, so they stay out:
@@ -259,8 +259,8 @@ jot()->add(new StripePayment(
 ```
 
 - Adding a second instance of the same class replaces the first.
-- `jot(StripePayment::class)` returns the added instance. When none was added, it creates one, if the constructor has no required arguments.
-- With required constructor arguments, `jot(StripePayment::class)` throws until the instance is added with `jot()->add(new ...)`. The exception names the class and the call to make.
+- `StripePayment::current()` returns the added instance. When none was added, it creates one, if the constructor has no required arguments.
+- With required constructor arguments, `StripePayment::current()` throws until the instance is added with `jot()->add(new ...)`. The exception names the class and the call to make.
 - `jot()` accepts `Section` subclasses only, and throws on any other class.
 
 Section classes can extend each other, for example a `Payment` section with shared fields, extended by `StripePayment` and `PaypalPayment`. A subclass inherits its parent's prefix. Adding both collides, so give the subclass its own `$prefix`, see [Key collisions](#key-collisions).
@@ -279,7 +279,7 @@ When two writes target the same key, Jot keeps one value and logs a warning. A c
 
 ```php
 jot()->add('payment.provider', 'paypal');
-jot(PaymentLog::class)->provider = PaymentProvider::Stripe;
+PaymentLog::current()->provider = PaymentProvider::Stripe;
 ```
 
 The event holds `"payment.provider": "stripe"`, and the app's default log channel gets a warning that names the key and both writers:
@@ -297,7 +297,7 @@ The details:
 | A loose field and a section property | the section, whatever the order: sections are flattened on top of loose fields when the event is built | yes |
 | An app field and an [automatic field](#automatic-fields) | the automatic field | yes |
 | A value and child keys under one name: `order` next to `order.id` | the child keys, the value is dropped | yes |
-| Two section classes with one prefix | they share one slot: adding one replaces the other, and `jot(Other::class)` returns the instance already there | no |
+| Two section classes with one prefix | they share one slot: adding one replaces the other. `jot(Other::class)` returns the instance already there, `Other::current()` throws `JotSectionPrefixConflict` unless that instance is an `Other` | no |
 
 An automatic field wins only when it has a value. With a user logged in, `jot()->add('user.id', 5)` gives way to that user's ID. With no user, `user.id` stays 5.
 

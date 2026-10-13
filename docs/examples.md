@@ -63,7 +63,7 @@ Jot adds the rest, such as `trace_id`, `http.route`, `user.id` and `session.hash
 
    jot()->add('booking.event_id', $event->id);
 
-   $payment = jot(PaymentLog::class);
+   $payment = PaymentLog::current();
    $payment->provider = PaymentProvider::Stripe;
    $payment->intentId = $intent->id;
    $payment->attempts++;
@@ -85,7 +85,7 @@ Jot adds the rest, such as `trace_id`, `http.route`, `user.id` and `session.hash
 4. In the Stripe webhook handler, add the outcome and the trace ID read back from the intent:
 
    ```php
-   $payment = jot(PaymentLog::class);
+   $payment = PaymentLog::current();
    $payment->intentId = $request->input('data.object.id');
    $payment->traceId = $request->input('data.object.metadata.trace_id');
    $payment->status = $request->input('type') === 'payment_intent.succeeded'

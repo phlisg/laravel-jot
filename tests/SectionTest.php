@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 use MarvelousDigital\WideEvents\Attributes\Hide;
 use MarvelousDigital\WideEvents\Attributes\Key;
+use MarvelousDigital\WideEvents\Exceptions\JotSectionPrefixConflict;
 use MarvelousDigital\WideEvents\Exceptions\JotSectionRequiresInitialisation;
 use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Section;
@@ -125,6 +126,16 @@ describe('section registry', function () {
         expect(jot(MySection::class))->toBe($section);
     });
 
+    it('returns the same instance from current() as from jot()', function () {
+        expect(PaymentLog::current())->toBe(jot(PaymentLog::class));
+    });
+
+    it('refuses current() when another class holds the same prefix', function () {
+        jot()->add(new StripePayment('pi_1', 100, 10));
+
+        PaymentLog::current();
+    })->throws(JotSectionPrefixConflict::class, 'Section '.PaymentLog::class.' shares the prefix "payment" with '.StripePayment::class);
+
     it('keeps one section per prefix', function () {
         expect(jot(new MySection))->not->toBe(jot(new MyOtherSection));
     });
@@ -187,6 +198,13 @@ describe('in the event', function () {
 
         expect(jot()->initialize(Request::create('/'))->event())
             ->toMatchArray(['payment.provider' => 'stripe', 'payment.attempts' => 0]);
+    });
+
+    it('writes a field set through current()', function () {
+        PaymentLog::current()->provider = PaymentProvider::Stripe;
+
+        expect(jot()->initialize(Request::create('/'))->event())
+            ->toMatchArray(['payment.provider' => 'stripe']);
     });
 
     it('keeps the section value over a loose field, whatever the order, with a warning', function (bool $sectionFirst) {

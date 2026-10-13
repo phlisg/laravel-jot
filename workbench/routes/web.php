@@ -34,7 +34,7 @@ Route::withoutMiddleware([PreventRequestForgery::class])->group(function () {
     Route::post('/events/{event}/pay', function (int $event) {
         jot()->add('booking.event_id', $event);
 
-        $payment = jot(PaymentLog::class);
+        $payment = PaymentLog::current();
         $payment->provider = PaymentProvider::Stripe;
         $payment->intentId = 'pi_'.Str::random(24);
         $payment->attempts++;
@@ -45,7 +45,7 @@ Route::withoutMiddleware([PreventRequestForgery::class])->group(function () {
     })->name('events.pay');
 
     Route::post('/stripe/webhook', function (Request $request) {
-        $payment = jot(PaymentLog::class);
+        $payment = PaymentLog::current();
         $payment->intentId = $request->input('data.object.id');
         $payment->status = $request->input('type') === 'payment_intent.succeeded'
             ? PaymentStatus::Approved

@@ -3,6 +3,7 @@
 namespace MarvelousDigital\WideEvents;
 
 use Illuminate\Support\Str;
+use MarvelousDigital\WideEvents\Exceptions\JotSectionPrefixConflict;
 
 abstract class Section
 {
@@ -25,6 +26,18 @@ abstract class Section
     }
 
     protected static ?string $prefix = null;
+
+    /** The instance of this section in the running event. */
+    final public static function current(): static
+    {
+        $section = jot(static::class);
+
+        if (! $section instanceof static) {
+            throw JotSectionPrefixConflict::for(static::class, $section);
+        }
+
+        return $section;
+    }
 
     final public function toDotNotation(): array
     {

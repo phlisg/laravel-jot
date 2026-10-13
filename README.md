@@ -263,7 +263,7 @@ Code anywhere in a request, job, command or scheduled task adds fields with `jot
 ```php
 jot()->add('payment.provider', 'stripe');                    // string key: a typo creates a new field
 jot()->add(Field::ExperimentVariant, 'b');                    // backed enum key: fixes the name
-jot(PaymentLog::class)->status = PaymentStatus::Declined;     // section: fixes the name and the type
+PaymentLog::current()->status = PaymentStatus::Declined;      // section: fixes the name and the type
 ```
 
 Use sections in `app/Jot` for any field you keep. Use string keys while exploring, then move them to a section. `JOT_STRICT=true` logs a warning for each string key, to find them.
@@ -286,10 +286,10 @@ final class PaymentLog extends Section
 }
 ```
 
-`PaymentLog` writes under `payment`: the class name in snake case, without a `Log` or `Section` suffix. `intentId` becomes `payment.intent_id`, enums are written as their value, `null` properties are skipped. `jot(PaymentLog::class)` returns the same instance for the whole request, so any class can fill it:
+`PaymentLog` writes under `payment`: the class name in snake case, without a `Log` or `Section` suffix. `intentId` becomes `payment.intent_id`, enums are written as their value, `null` properties are skipped. `PaymentLog::current()` returns the same instance for the whole request, so any class can fill it:
 
 ```php
-$payment = jot(PaymentLog::class);
+$payment = PaymentLog::current();
 $payment->provider = PaymentProvider::Stripe;
 $payment->attempts++;
 ```
