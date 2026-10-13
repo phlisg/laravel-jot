@@ -3,6 +3,7 @@
 namespace MarvelousDigital\WideEvents\Tests;
 
 use Closure;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Laravel\Prompts\Key;
@@ -24,6 +25,20 @@ class FollowedTailCommand extends TailCommand
     {
         $poll = array_shift(static::$polls) ?? throw new LogicException('stop following');
         $poll();
+    }
+}
+
+/** Runs one queued closure before each read of the files. */
+class RefreshedTailCommand extends TailCommand
+{
+    /** @var list<Closure(): void> */
+    public static array $reads = [];
+
+    protected function recent(array $files, int $limit): array
+    {
+        (array_shift(static::$reads) ?? fn () => null)();
+
+        return parent::recent($files, $limit);
     }
 }
 
@@ -223,15 +238,31 @@ it('prints the plain list without an interactive input', function () {
     $this->artisan('jot:tail', ['-i' => true, '--no-interaction' => true])->expectsOutputToContain('GET home 200')->assertSuccessful();
 });
 
-it('searches the table by span ID', function () {
-    tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
+it('searches the table by span ID, r typed as a letter', function () {
+    tailed('older', ['span_id' => 'aaaarrrraaaarrrr', 'timestamp' => now()->subMinute()->toIso8601String()]);
     tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb']);
 
-    Prompt::fake(['/', 'A', 'A', 'A', 'A', Key::ENTER, Key::ENTER]);
+    Prompt::fake(['/', 'A', 'R', 'r', Key::ENTER, Key::ENTER]);
 
     $this->artisan('jot:tail', ['-i' => true])
         ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
-        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->expectsOutputToContain('aaaarrrraaaarrrr')
         ->doesntExpectOutputToContain('bbbbbbbbbbbbbbbb')
+        ->assertSuccessful();
+});
+
+it('reloads the events with r, the cursor kept on its span', function () {
+    tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
+    tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb', 'timestamp' => now()->subSeconds(30)->toIso8601String()]);
+    RefreshedTailCommand::$reads = [fn () => null, fn () => tailed('newest', ['span_id' => 'cccccccccccccccc'])];
+    app(Kernel::class)->registerCommand(app(RefreshedTailCommand::class));
+
+    Prompt::fake([Key::DOWN, 'r', Key::ENTER]);
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('newest')
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->doesntExpectOutputToContain('cccccccccccccccc')
         ->assertSuccessful();
 });

@@ -5,12 +5,13 @@ namespace MarvelousDigital\WideEvents\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Prompts\DataTablePrompt;
+use Laravel\Prompts\Key;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use MarvelousDigital\WideEvents\Writer;
 use Psr\Log\LogLevel;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-use function Laravel\Prompts\datatable;
 use function Laravel\Prompts\select;
 
 #[AsCommand(name: 'jot:tail')]
@@ -147,24 +148,35 @@ class TailCommand extends Command
     protected function browse(array $files, array $events): void
     {
         $events = array_reverse($events);
-        $rows = array_map(fn ($event) => [
-            isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--',
-            (string) ($event['entrypoint'] ?? '?'),
-            $this->what($event),
-            (string) ($event['duration_ms'] ?? ''),
-            Str::limit((string) $this->errorMessage($event), 60),
-        ], $events);
-
-        // The filter gets the row without its key, so the IDs are looked up by the row's text; identical rows share them.
-        $ids = [];
-        foreach ($rows as $i => $row) {
-            $key = implode("\0", $row);
-            $ids[$key] = ($ids[$key] ?? '').' '.($events[$i]['trace_id'] ?? '').' '.$events[$i]['span_id'];
-        }
-        $filter = fn (array $row, string $query) => str_contains(mb_strtolower(implode(' ', $row).$ids[implode("\0", $row)]), mb_strtolower($query));
+        $span = null;
 
         while (true) {
-            $event = $events[datatable(['Time', 'Type', 'What', 'ms', 'Error'], $rows, scroll: min(10, count($rows)), label: 'Recent events', hint: '/ searches, IDs included; Enter shows every field', filter: $filter)];
+            $refresh = false;
+            $table = $this->eventsTable($events, $span);
+            $table->on('key', function (string $key) use ($table, &$refresh) {
+                if ($key === 'r' && $table->state !== 'search') {
+                    $refresh = true;
+                    $table->state = 'submit';
+                }
+            });
+            $index = $table->prompt();
+
+            if ($refresh) {
+                $span = $events[$index]['span_id'] ?? null;
+                $files = $this->sources()[0];
+                $events = array_reverse($this->recent($files, max(1, (int) $this->option('limit'))));
+
+                if ($events === []) {
+                    $this->components->warn('No matching event left.');
+
+                    return;
+                }
+
+                continue;
+            }
+
+            $event = $events[$index];
+            $span = null;
 
             do {
                 $this->fields($event);
@@ -179,6 +191,46 @@ class TailCommand extends Command
                 return;
             }
         }
+    }
+
+    /**
+     * The events table, its search matching the trace and span IDs too, the cursor on the span given.
+     *
+     * @param  list<array<string, mixed>>  $events
+     */
+    protected function eventsTable(array $events, ?string $span): DataTablePrompt
+    {
+        $rows = array_map(fn ($event) => [
+            isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--',
+            (string) ($event['entrypoint'] ?? '?'),
+            $this->what($event),
+            (string) ($event['duration_ms'] ?? ''),
+            Str::limit((string) $this->errorMessage($event), 60),
+        ], $events);
+
+        // The filter gets the row without its key, so the IDs are looked up by the row's text; identical rows share them.
+        $ids = [];
+        foreach ($rows as $i => $row) {
+            $key = implode("\0", $row);
+            $ids[$key] = ($ids[$key] ?? '').' '.($events[$i]['trace_id'] ?? '').' '.$events[$i]['span_id'];
+        }
+
+        $table = new DataTablePrompt(
+            ['Time', 'Type', 'What', 'ms', 'Error'],
+            $rows,
+            scroll: min(10, count($rows)),
+            label: 'Recent events',
+            hint: '/ search · r refresh · Enter shows every field',
+            filter: fn (array $row, string $query) => str_contains(mb_strtolower(implode(' ', $row).$ids[implode("\0", $row)]), mb_strtolower($query)),
+        );
+
+        // Arrow presses through the public event API: Prompts keeps highlight() protected.
+        $down = array_search($span, array_column($events, 'span_id'), true);
+        for ($i = 0; $i < (int) $down; $i++) {
+            $table->emit('key', Key::DOWN);
+        }
+
+        return $table;
     }
 
     /**
