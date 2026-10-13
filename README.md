@@ -595,6 +595,9 @@ To get the new defaults:
 1. Republish the config: `php artisan vendor:publish --tag=jot-config --force`.
 2. Reapply the app's changes to `config/jot.php`.
 3. Run `php artisan jot:env` to add the new keys to `.env.example` and `.env`.
+4. Remove `JOT_SAMPLE_RATE=1.0` from `.env.example` and `.env`. `jot:env` added it before 0.3, and it keeps every request.
+
+A section class with `Log` or `Section` inside its name, such as `LoginLog`, now writes under its full name (`login`). Before 0.3, both words were removed anywhere in the name (`in`).
 
 ## Roadmap
 

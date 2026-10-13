@@ -12,7 +12,7 @@ class EnvCommand extends Command
 
     protected $description = 'Add the Jot keys missing from .env.example and .env, with their default values';
 
-    // Must match the env() defaults in config/jot.php.
+    // Must match the env() defaults in config/jot.php. The sampling rates stay out: their default depends on APP_ENV.
     public const KEYS = [
         'JOT_ENABLED' => 'true',
         'JOT_CHANNEL' => '',
@@ -20,10 +20,12 @@ class EnvCommand extends Command
         'APP_VERSION' => '',
         'JOT_REGION' => '',
         'JOT_STRICT' => 'false',
-        'JOT_SAMPLE_RATE' => '1.0',
         'JOT_SENTRY' => 'true',
         'JOT_SENTRY_LEVEL' => 'info',
         'JOT_SENTRY_LINK' => '',
+        'JOT_DAYS' => '7',
+        'JOT_MAX_PER_MINUTE' => '10',
+        'JOT_ERROR_PAGE' => 'true',
     ];
 
     public function handle(): int

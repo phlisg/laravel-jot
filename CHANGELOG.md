@@ -7,7 +7,9 @@ All notable changes to `laravel-wide-events` are listed here, newest first. Unti
 Outside the `local` and `testing` environments, Jot writes only what helps debug an incident: errors, slow events, failed commands and scheduled tasks, events raised with `jot()->raise()`, and 1% of 4xx responses. Normal requests are no longer written there. See [Sampling](README.md#sampling). To upgrade:
 
 - Republish the config with `php artisan vendor:publish --tag=jot-config --force`, then reapply the app's changes. A config published before 0.3 keeps its old `sampling` and `console` keys, so `sampling.rate` stays `1.0` and every request is still written.
+- Remove `JOT_SAMPLE_RATE=1.0` from `.env.example` and `.env`. `jot:env` added it before 0.3, and it keeps every request. `jot:env` no longer writes the sampling rates.
 - To keep writing every request in an environment, set `JOT_SAMPLE_RATE=1.0`.
+- A section class with `Log` or `Section` inside its name, such as `LoginLog`, now writes under its full name (`login`). Before, both words were removed anywhere in the name (`in`).
 
 New:
 

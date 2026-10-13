@@ -45,3 +45,8 @@ it('lists only keys that config/jot.php reads', function () {
         expect($config)->toContain("env('$key'");
     }
 });
+
+it('leaves out the sampling rates, whose default depends on the environment', function () {
+    expect(EnvCommand::KEYS)->not->toHaveKeys(['JOT_SAMPLE_RATE', 'JOT_SAMPLE_CLIENT_ERRORS'])
+        ->toHaveKeys(['JOT_DAYS', 'JOT_MAX_PER_MINUTE', 'JOT_ERROR_PAGE']);
+});
