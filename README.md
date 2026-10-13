@@ -59,27 +59,23 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 
 ## Installation
 
-The package lives in a private GitHub repository and is not on Packagist, so Composer needs the repository and a token before `composer require` works:
+The package lives in a private GitHub repository and is not on Packagist. To install it:
 
-1. Give Composer a GitHub token that can read `Marvelous-Digital/laravel-wide-events`:
-   ```sh
-   composer config github-oauth.github.com <token>
-   ```
-   `<token>` is a GitHub personal access token (PAT), for example a fine-grained token with read access to the repository's contents. Composer stores it in the app's `auth.json`, which Laravel's `.gitignore` already leaves out of git.
-2. Add the repository to the `repositories` list in the app's `composer.json`:
+1. Copy the `auth.json` of another Marvelous project to the app's root. It holds the GitHub token Composer uses to read private repositories:
    ```json
-   "repositories": [
-       { "type": "vcs", "url": "https://github.com/Marvelous-Digital/laravel-wide-events" }
-   ]
+   { "github-oauth": { "github.com": "<token>" } }
+   ```
+   Laravel's `.gitignore` already keeps `auth.json` out of git.
+2. Add the repository to the `repositories` list in `composer.json`:
+   ```json
+   { "type": "vcs", "url": "https://github.com/Marvelous-Digital/laravel-wide-events" }
    ```
 3. Install:
    ```sh
    composer require marvelous-digital/laravel-wide-events
    ```
 
-> Add the repository to `composer.json` by hand. `composer config repositories.<name> ...` turns an existing `repositories` list into an object, which recent Composer versions reject.
-
-> CI and deploy servers need the token too, for example through the `COMPOSER_AUTH` environment variable: `{"github-oauth": {"github.com": "<token>"}}`.
+> CI and deploy servers need the token too, for example in the `COMPOSER_AUTH` environment variable, with the same content as `auth.json`.
 
 Nothing else is required. The package registers its helper, service provider, global middleware and event listeners itself, and its defaults apply until the app publishes `config/jot.php`.
 
