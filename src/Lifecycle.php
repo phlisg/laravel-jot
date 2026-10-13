@@ -143,11 +143,20 @@ class Lifecycle
 
     protected function endCommand(CommandFinished $e): void
     {
-        $this->pop($e->input, function (Jot $jot) use ($e) {
+        $fill = function (Jot $jot) use ($e) {
             $console = $jot->builtIn(ConsoleSection::class);
             $console->exitCode = $e->exitCode;
             [$console->arguments, $console->options] = $this->passed($e->command, $e->input);
-        });
+        };
+
+        // Laravel reports a command's exception after CommandFinished: a failed outer command emits on terminate, with its error.
+        if ($e->exitCode !== 0 && count($this->stack) === 1 && $this->top() === $e->input) {
+            $fill(app(Jot::class));
+
+            return;
+        }
+
+        $this->pop($e->input, $fill);
     }
 
     /**

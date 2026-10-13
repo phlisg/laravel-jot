@@ -339,11 +339,12 @@ it('adds the exception of a command that throws to its event', function () {
     app()->terminate();
 
     expect(emittedBy('console'))->toMatchArray(['console.exit_code' => 1, 'error.type' => RuntimeException::class]);
-})->skip('Bug: CommandFinished fires before Laravel reports the exception, so the event has no error.type.');
+});
 
 it('writes nothing for long-running commands, dev tools and Composer hooks', function (string $command) {
     runCommand($command, exitCode: 1);
     runCommand('reports:send', exitCode: 1);
+    app()->terminate();
 
     expect(array_column(emitted(), 'console.command'))->toBe(['reports:send']);
 })->with([
