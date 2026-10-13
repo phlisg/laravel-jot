@@ -2,6 +2,8 @@
 
 Laravel Wide Events writes one structured log event ("wide event") per HTTP request, queued job, Artisan command or scheduled task, with a typed schema that keeps the fields queryable.
 
+![jot:query --follow printing one event per request and queued job as the workbench demos run](docs/images/hero.gif)
+
 ## Contents
 
 - [Why](#why)
@@ -161,6 +163,8 @@ At a terminal, the recent events open in a table. Arrow keys move, `/` searches 
 ```sh
 php artisan jot:query --since=1h
 ```
+
+![Browsing recent events with jot:query: search, every field of a request, then its trace and the failed job](docs/images/browse.gif)
 
 ```
 ┌ Recent events ──────────────────────────────────────────────────────────┐
