@@ -76,7 +76,7 @@ return [
         // Long-running commands, wildcards allowed.
         'ignore' => [
             'queue:work', 'queue:listen', 'horizon*', 'octane:*', 'reverb:start',
-            'schedule:run', 'schedule:work', 'pail', 'tinker', 'jot:*',
+            'schedule:run', 'schedule:work', 'pail', 'tinker', 'jot:*', 'help', 'list',
         ],
     ],
 
