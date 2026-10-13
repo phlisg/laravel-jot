@@ -23,14 +23,10 @@ use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
-use Livewire\Livewire;
 use MarvelousDigital\WideEvents\Sections\ConsoleSection;
 use MarvelousDigital\WideEvents\Sections\JobSection;
-use MarvelousDigital\WideEvents\Sections\LivewireSection;
 use MarvelousDigital\WideEvents\Sections\PerformanceSection;
 use MarvelousDigital\WideEvents\Sections\RequestSection;
 use MarvelousDigital\WideEvents\Sections\ScheduleSection;
@@ -38,11 +34,7 @@ use MarvelousDigital\WideEvents\Sections\UserSection;
 use Symfony\Component\Console\Input\InputInterface;
 
 /**
- * Singleton: starts and emits the job, command and scheduled task events.
- *
- * Each unit of work gets a fresh accumulator. The stack restores the previous
- * one and its Context, so a sync job or Artisan::call() inside a request
- * leaves the request's fields alone.
+ * Singleton: starts and emits the job, command and scheduled task events, and fills the user and performance sections.
  */
 class Lifecycle
 {
@@ -78,12 +70,12 @@ class Lifecycle
         }
 
         if (config('jot.fields.auth', true)) {
-            $events->listen(Login::class, fn () => $this->user(fn (UserSection $user) => $user->authResult = 'success'));
-            $events->listen(Failed::class, fn () => $this->user(fn (UserSection $user) => $user->authResult = 'failed'));
+            $events->listen(Login::class, fn () => $this->section(UserSection::class, fn (UserSection $user) => $user->authResult = 'success'));
+            $events->listen(Failed::class, fn () => $this->section(UserSection::class, fn (UserSection $user) => $user->authResult = 'failed'));
         }
 
         $this->registerPerformance($events);
-        $this->registerLivewire();
+        (new LivewireListener)->register();
 
         // A command that throws never fires CommandFinished.
         app()->terminating(function () {
@@ -98,115 +90,27 @@ class Lifecycle
         $on = fn (string $group) => config('jot.fields.performance') && config("jot.fields.performance.$group", true);
 
         if ($on('db')) {
-            $events->listen(QueryExecuted::class, fn (QueryExecuted $e) => $this->performance(function (PerformanceSection $p) use ($e) {
+            $events->listen(QueryExecuted::class, fn (QueryExecuted $e) => $this->section(PerformanceSection::class, function (PerformanceSection $p) use ($e) {
                 $p->dbQueryCount++;
                 $p->dbTimeMs += $e->time;
             }));
         }
 
         if ($on('cache')) {
-            $events->listen(CacheHit::class, fn () => $this->performance(fn (PerformanceSection $p) => $p->cacheHits++));
-            $events->listen(CacheMissed::class, fn () => $this->performance(fn (PerformanceSection $p) => $p->cacheMisses++));
+            $events->listen(CacheHit::class, fn () => $this->section(PerformanceSection::class, fn (PerformanceSection $p) => $p->cacheHits++));
+            $events->listen(CacheMissed::class, fn () => $this->section(PerformanceSection::class, fn (PerformanceSection $p) => $p->cacheMisses++));
         }
 
         if ($on('http_client')) {
-            $events->listen(ResponseReceived::class, fn (ResponseReceived $e) => $this->performance(function (PerformanceSection $p) use ($e) {
+            $events->listen(ResponseReceived::class, fn (ResponseReceived $e) => $this->section(PerformanceSection::class, function (PerformanceSection $p) use ($e) {
                 $p->httpClientCount++;
                 $p->httpClientTimeMs += round(($e->response->transferStats?->getTransferTime() ?? 0) * 1000, 1);
             }));
-            $events->listen(ConnectionFailed::class, fn () => $this->performance(fn (PerformanceSection $p) => $p->httpClientCount++));
+            $events->listen(ConnectionFailed::class, fn () => $this->section(PerformanceSection::class, fn (PerformanceSection $p) => $p->httpClientCount++));
         }
 
         if ($on('queue')) {
-            $events->listen(JobQueued::class, fn () => $this->performance(fn (PerformanceSection $p) => $p->queueDispatched++));
-        }
-    }
-
-    /**
-     * Each listener returns nothing: Livewire calls back a listener's return value when the request ends.
-     */
-    protected function registerLivewire(): void
-    {
-        if (! app()->bound('livewire') || ! config('jot.fields.livewire', true)) {
-            return;
-        }
-
-        Livewire::listen('hydrate', function ($component, $memo) {
-            $this->livewire(function (LivewireSection $livewire) use ($component, $memo) {
-                $livewire->page ??= $memo['path'] ?? null;
-                $livewire->remember('components', $component->getName());
-            });
-        });
-
-        Livewire::listen('update', function ($component, $path) {
-            $this->livewire(fn (LivewireSection $livewire) => $livewire->remember('updates', $path));
-        });
-
-        // $metadata: Livewire 4 only.
-        Livewire::listen('call', function ($component, $method, $params, $context, $returnEarly, $metadata = []) {
-            $this->livewire(fn (LivewireSection $livewire) => $this->call($livewire, $component, $method, $params, $metadata));
-        });
-
-        Livewire::listen('exception', function ($component, $e) {
-            if ($e instanceof ValidationException) {
-                $this->livewire(function (LivewireSection $livewire) use ($e) {
-                    $livewire->validationFailed = true;
-                    array_map(fn ($field) => $livewire->remember('validationFields', (string) $field), array_keys($e->errors()));
-                });
-            }
-        });
-    }
-
-    protected function call(LivewireSection $livewire, object $component, string $method, array $params, array $metadata): void
-    {
-        if (($metadata['type'] ?? null) === 'poll') {
-            $livewire->poll = true;
-        }
-
-        match ($method) {
-            '__dispatch' => $livewire->remember('events', (string) ($params[0] ?? '')),
-            '__lazyLoad' => $livewire->lazy = true,
-            default => null,
-        };
-
-        // Livewire internals, such as uploads, and Livewire 4 magic actions, such as $refresh.
-        if (str_starts_with($method, '_') || str_starts_with($method, '$')) {
-            return;
-        }
-
-        $livewire->remember('calls', $component->getName().'::'.$method);
-        $livewire->filamentAction = $this->filamentAction($component, $method, $params) ?? $livewire->filamentAction;
-    }
-
-    protected function filamentAction(object $component, string $method, array $params): ?string
-    {
-        // mountAction(name), mountTableAction(name), mountFormComponentAction(component, name)...
-        if (str_starts_with($method, 'mount') && str_ends_with($method, 'Action')) {
-            $name = $params[$method === 'mountFormComponentAction' ? 1 : 0] ?? null;
-
-            return is_string($name) ? $name : null;
-        }
-
-        // callMountedAction() reads $mountedActions: names in Filament 3, ['name' => ...] in Filament 4.
-        if (str_starts_with($method, 'callMounted')) {
-            $list = lcfirst(substr($method, 4)).'s';
-            $action = property_exists($component, $list) ? Arr::last((array) $component->{$list}) : null;
-            $name = is_array($action) ? ($action['name'] ?? null) : $action;
-
-            return is_string($name) ? $name : null;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  Closure(LivewireSection): mixed  $change
-     */
-    protected function livewire(Closure $change): void
-    {
-        // Update requests only: the exception hook also fires on the first page load.
-        if (jot()->traceId() && Str::endsWith((string) request()->route()?->getName(), 'livewire.update')) {
-            $change(jot()->reserve(new LivewireSection));
+            $events->listen(JobQueued::class, fn () => $this->section(PerformanceSection::class, fn (PerformanceSection $p) => $p->queueDispatched++));
         }
     }
 
@@ -334,22 +238,15 @@ class Lifecycle
     }
 
     /**
-     * @param  Closure(UserSection): mixed  $change
+     * @template T of Section
+     *
+     * @param  class-string<T>  $class
+     * @param  Closure(T): mixed  $change
      */
-    protected function user(Closure $change): void
+    protected function section(string $class, Closure $change): void
     {
-        if ($user = jot()->builtIn(UserSection::class)) {
-            $change($user);
-        }
-    }
-
-    /**
-     * @param  Closure(PerformanceSection): mixed  $change
-     */
-    protected function performance(Closure $change): void
-    {
-        if ($performance = jot()->builtIn(PerformanceSection::class)) {
-            $change($performance);
+        if ($section = jot()->builtIn($class)) {
+            $change($section);
         }
     }
 }

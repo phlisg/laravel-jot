@@ -7,6 +7,7 @@ How Jot collects fields during a unit of work and writes them as one event. For 
 - `Jot`: the accumulator. Holds the fields and sections of the current request, job, command or scheduled task. Bound as scoped, so the container drops it at each new request (including under Laravel Octane) and each new job.
 - `Writer`: singleton. Samples each event and writes it to the outputs. Holds what must outlive the accumulator: `keepWhen` and `dropWhen` rules, the `Jot::user()` callback and the fake used by `Jot::fake()`.
 - `Lifecycle`: singleton. Listens to queue, console, scheduler, auth and performance events. Starts and emits the event of each job, command and scheduled task.
+- `LivewireListener`: listens to Livewire's hooks and fills `Sections\LivewireSection` on update requests. `Lifecycle` registers it.
 - `Middleware\JotRequest`: global HTTP middleware. Starts the request event in `handle()`, emits it in `terminate()`.
 - `Sections\*`: built-in sections, one per group of automatic fields. The accumulator keeps them apart from app sections, keyed by class.
 
@@ -89,7 +90,7 @@ Scheduler:
 Livewire:
 
 1. Each component action is a `POST` to the `livewire.update` route, so it gets an HTTP event like any request.
-2. `Lifecycle` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` only on that route. The same hooks fire on the first page load, which stays a plain HTTP event.
+2. `LivewireListener` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` only on that route. The same hooks fire on the first page load, which stays a plain HTTP event.
 3. A listener must return nothing. Livewire calls back any returned closure when the request ends.
 4. Livewire answers a failed validation with a 200 and never reports it. The `exception` hook still sees it, which gives `livewire.validation_*`.
 
