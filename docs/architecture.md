@@ -2,22 +2,6 @@
 
 How Jot collects fields during a unit of work (a request, job, command or scheduled task) and writes them as one event. For usage, see the [README](../README.md).
 
-## Contents
-
-- [Classes](#classes)
-- [Context](#context)
-- [Units of work](#units-of-work)
-  - [Request](#request)
-  - [Queue](#queue)
-  - [Console](#console)
-  - [Scheduler](#scheduler)
-  - [Livewire](#livewire)
-- [The stack](#the-stack)
-- [Building the event](#building-the-event)
-- [Writing](#writing)
-- [Open questions](#open-questions)
-- [Out of scope](#out-of-scope)
-
 ```
  HTTP request           queued or sync job       artisan command        scheduled task
       │                        │                        │                      │
@@ -58,6 +42,22 @@ To fix a bug, find the stage in this table, then read the section below.
 | A request's fields leak into a job event, or vanish | [The stack](#the-stack) |
 | Wrong key order, lost value, collision warning | [Building the event](#building-the-event) |
 | Event never written, or written to the wrong place | [Writing](#writing) |
+
+## Contents
+
+- [Classes](#classes)
+- [Context](#context)
+- [Units of work](#units-of-work)
+  - [Request](#request)
+  - [Queue](#queue)
+  - [Console](#console)
+  - [Scheduler](#scheduler)
+  - [Livewire](#livewire)
+- [The stack](#the-stack)
+- [Building the event](#building-the-event)
+- [Writing](#writing)
+- [Open questions](#open-questions)
+- [Out of scope](#out-of-scope)
 
 ## Classes
 

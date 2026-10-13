@@ -2,16 +2,6 @@
 
 `php artisan jot:query` finds wide events in the log files of the server it runs on. Run it on the server that handled the request. The README covers the commands used most, see [Reading events](../README.md#reading-events).
 
-## Contents
-
-- [Find one request](#find-one-request)
-- [Filter](#filter)
-- [Follow live](#follow-live)
-- [JSON for scripts](#json-for-scripts)
-- [Browsing](#browsing)
-- [Options](#options)
-- [Where it reads](#where-it-reads)
-
 | Command | Prints |
 |---|---|
 | `jot:query` | the most recent events, with filters |
@@ -21,6 +11,16 @@
 A trace ID (32 hex characters) groups a request with the jobs it queued. A span ID (16 hex characters) names one event. Both appear on every line `jot:query` prints.
 
 At a terminal, `jot:query` opens an interactive table, see [Browsing](#browsing). Piped, in CI (continuous integration), with `-n` (`--no-interaction`) or with `--json`, it prints plain lines, as in the samples below.
+
+## Contents
+
+- [Find one request](#find-one-request)
+- [Filter](#filter)
+- [Follow live](#follow-live)
+- [JSON for scripts](#json-for-scripts)
+- [Browsing](#browsing)
+- [Options](#options)
+- [Where it reads](#where-it-reads)
 
 ## Find one request
 
