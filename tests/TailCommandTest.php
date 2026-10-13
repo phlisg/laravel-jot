@@ -2,11 +2,30 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use Closure;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Laravel\Prompts\Key;
 use Laravel\Prompts\Prompt;
+use LogicException;
+use MarvelousDigital\WideEvents\Commands\TailCommand;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Writer;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+
+/** Runs one queued closure per poll of --follow, then stops it. */
+class FollowedTailCommand extends TailCommand
+{
+    /** @var list<Closure(): void> */
+    public static array $polls = [];
+
+    protected function pause(): void
+    {
+        $poll = array_shift(static::$polls) ?? throw new LogicException('stop following');
+        $poll();
+    }
+}
 
 function tailed(string $route, array $fields = []): void
 {
@@ -120,6 +139,61 @@ it('browses the events in a table', function () {
         ->doesntExpectOutputToContain('user.id')
         ->expectsOutputToContain('1 event(s)')
         ->assertSuccessful();
+});
+
+it('goes back to the list to pick another event', function () {
+    tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
+    tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb']);
+
+    // Mockery hands out the queued keys in order, across both tables.
+    Prompt::fake([Key::DOWN, Key::ENTER, Key::ENTER]);
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsChoice('Next', 'list', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->expectsOutputToContain('older')
+        ->expectsOutputToContain('bbbbbbbbbbbbbbbb')
+        ->expectsOutputToContain('newer')
+        ->assertSuccessful();
+});
+
+it('warns instead of browsing when nothing matches', function () {
+    tailed('home');
+
+    $this->artisan('jot:tail', ['-i' => true, '--where' => ['http.route=nope']])
+        ->expectsOutputToContain('No matching event')
+        ->assertFailed();
+});
+
+it('refuses a --where without a value', function () {
+    $this->artisan('jot:tail', ['--where' => ['user.id']])->expectsOutputToContain('Expected key=value')->assertExitCode(2);
+});
+
+it('follows new lines, and the next daily file whole', function () {
+    $today = storage_path('logs/jot-tail-'.now()->format('Y-m-d').'.log');
+    $yesterday = storage_path('logs/jot-tail-'.now()->subDay()->format('Y-m-d').'.log');
+    @unlink($today);
+    @unlink($yesterday);
+    config(['logging.channels.tail' => ['driver' => 'daily', 'path' => storage_path('logs/jot-tail.log')]]);
+
+    tailed('old');
+    Log::forgetChannel('tail');
+    rename($today, $yesterday);
+    touch($yesterday, now()->subMinute()->getTimestamp());
+
+    FollowedTailCommand::$polls = [fn () => tailed('rolled'), fn () => tailed('appended')];
+    $command = app(FollowedTailCommand::class);
+    $command->setLaravel(app());
+    $output = new BufferedOutput;
+
+    expect(fn () => $command->run(new ArrayInput(['--follow' => true]), $output))->toThrow(LogicException::class, 'stop following');
+
+    preg_match_all('/GET (\S+)/', $output->fetch(), $matches);
+    expect($matches[1])->toBe(['old', 'rolled', 'appended']);
+
+    unlink($today);
+    unlink($yesterday);
 });
 
 it('refuses --interactive with --follow or --json', function () {
