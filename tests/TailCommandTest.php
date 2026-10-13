@@ -206,3 +206,16 @@ it('prints the plain list without an interactive input', function () {
 
     $this->artisan('jot:tail', ['-i' => true, '--no-interaction' => true])->expectsOutputToContain('GET home 200')->assertSuccessful();
 });
+
+it('searches the table by span ID', function () {
+    tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
+    tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb']);
+
+    Prompt::fake(['/', 'A', 'A', 'A', 'A', Key::ENTER, Key::ENTER]);
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->doesntExpectOutputToContain('bbbbbbbbbbbbbbbb')
+        ->assertSuccessful();
+});
