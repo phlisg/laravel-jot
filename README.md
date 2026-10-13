@@ -141,6 +141,8 @@ http  f56220033574661e  POST checkout.store 200  412ms
 - `--days=7`: how many days of files to read.
 - `--json`: one JSON line per event.
 
+At a terminal, a trace ID opens the trace as a list laid out as the tree. Enter on an event prints every field, then go back to the trace or quit. With `--json`, `-n`, piped output or a single event, it prints the tree as above.
+
 #### Recent events
 
 `jot:tail` prints the most recent events, oldest first, one line per event: time, trace ID, then the same summary as `jot:query`.
