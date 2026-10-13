@@ -3,15 +3,12 @@
 namespace MarvelousDigital\WideEvents\Commands;
 
 use Illuminate\Console\Command;
-use MarvelousDigital\WideEvents\Commands\Concerns\BrowsesTraces;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Output\StreamOutput;
 
 #[AsCommand(name: 'jot:query')]
 class QueryCommand extends Command
 {
-    use BrowsesTraces;
     use ReadsEvents;
 
     protected $signature = 'jot:query
@@ -31,16 +28,17 @@ class QueryCommand extends Command
             return self::INVALID;
         }
 
-        [$files, $elsewhere] = $this->sources();
+        $days = (int) $this->option('days');
+        [$files, $elsewhere] = $this->sources($days);
         $span = strlen($id) === 16 ? $this->find($files, $id)->firstWhere('span_id', $id) : null;
         $trace = $span['trace_id'] ?? $id;
-        $events = $this->find($files, $trace)->where('trace_id', $trace)->sortBy('timestamp')->values();
+        $events = $this->trace($files, $trace);
 
         if ($events->isEmpty()) {
-            $this->components->warn("No event with ID {$id} in the last {$this->option('days')} days of: ".($files ? implode(', ', $files) : 'no readable log file'));
+            $this->warnNothing("event with ID {$id}", $days, $files);
         } elseif ($this->option('json')) {
             $events->each(fn ($event) => $this->line(json_encode($event, JSON_UNESCAPED_SLASHES)));
-        } elseif (! $span && $events->count() > 1 && $this->interactive()) {
+        } elseif (! $span && $events->count() > 1 && $this->atTerminal()) {
             $this->inspect($files, $this->pick($files, $trace), ['trace' => 'Back to the trace', 'quit' => 'Quit']);
         } else {
             $this->line("Trace <info>{$trace}</info>, {$events->count()} event(s)");
@@ -56,22 +54,8 @@ class QueryCommand extends Command
             }
         }
 
-        foreach ($elsewhere as $channel) {
-            $this->line($channel === 'sentry_logs'
-                ? "<comment>Also in Sentry Logs: search trace_id:{$trace}.</comment>"
-                : "<comment>Also written to the {$channel} channel, which jot:query cannot read.</comment>");
-        }
+        $this->printElsewhere($elsewhere, "Also in Sentry Logs: search trace_id:{$trace}.");
 
         return $events->isEmpty() ? self::FAILURE : self::SUCCESS;
-    }
-
-    /**
-     * Whether a person is at the terminal: an interactive input, and an output that is a TTY.
-     */
-    protected function interactive(): bool
-    {
-        $output = $this->output->getOutput();
-
-        return $this->input->isInteractive() && $output instanceof StreamOutput && stream_isatty($output->getStream());
     }
 }

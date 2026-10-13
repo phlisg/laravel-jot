@@ -7,7 +7,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Prompts\DataTablePrompt;
 use Laravel\Prompts\Key;
-use MarvelousDigital\WideEvents\Commands\Concerns\BrowsesTraces;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use MarvelousDigital\WideEvents\Writer;
 use Psr\Log\LogLevel;
@@ -16,7 +15,6 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: 'jot:tail')]
 class TailCommand extends Command
 {
-    use BrowsesTraces;
     use ReadsEvents;
 
     protected $signature = 'jot:tail
@@ -37,11 +35,14 @@ class TailCommand extends Command
 
     protected ?int $since = null;
 
+    protected int $days = 1;
+
     public function handle(): int
     {
         // Reset: the same instance runs again under Artisan::call().
         $this->where = [];
         $this->since = null;
+        $this->days = (int) $this->option('days');
 
         foreach ((array) $this->option('where') as $filter) {
             if (! str_contains((string) $filter, '=')) {
@@ -69,17 +70,17 @@ class TailCommand extends Command
 
             $unit = ['s' => 'seconds', 'm' => 'minutes', 'h' => 'hours', 'd' => 'days'][$match[2]];
             $this->since = now()->sub($unit, (int) $match[1])->getTimestamp();
-            $this->input->setOption('days', max((int) $this->option('days'), (int) ceil((now()->getTimestamp() - $this->since) / 86400)));
+            $this->days = max($this->days, (int) ceil((now()->getTimestamp() - $this->since) / 86400));
         }
 
-        [$files, $elsewhere] = $this->sources();
+        [$files, $elsewhere] = $this->sources($this->days);
         $events = $this->recent($files, max(1, (int) $this->option('limit')));
 
         if ($events === [] && ! $this->option('follow')) {
-            $this->components->warn("No matching event in the last {$this->option('days')} days of: ".($files ? implode(', ', $files) : 'no readable log file'));
+            $this->warnNothing('matching event', $this->days, $files);
         }
 
-        if ($events !== [] && $this->option('interactive') && $this->input->isInteractive()) {
+        if ($events !== [] && $this->option('interactive') && $this->atTerminal()) {
             $this->browse($files, $events);
 
             return self::SUCCESS;
@@ -93,11 +94,7 @@ class TailCommand extends Command
             $this->line('<comment>Run jot:query <trace_id> for a trace, or <span_id> for every field.</comment>');
         }
 
-        foreach ($elsewhere as $channel) {
-            $this->line($channel === 'sentry_logs'
-                ? '<comment>Also in Sentry Logs.</comment>'
-                : "<comment>Also written to the {$channel} channel, which jot:tail cannot read.</comment>");
-        }
+        $this->printElsewhere($elsewhere, 'Also in Sentry Logs.');
 
         if ($this->option('follow')) {
             $this->follow();
@@ -163,7 +160,7 @@ class TailCommand extends Command
 
             if ($refresh) {
                 $span = $events[$index]['span_id'] ?? null;
-                $files = $this->sources()[0];
+                $files = $this->sources($this->days)[0];
                 $events = array_reverse($this->recent($files, max(1, (int) $this->option('limit'))));
 
                 if ($events === []) {
@@ -191,7 +188,7 @@ class TailCommand extends Command
     protected function eventsTable(array $events, ?string $span): DataTablePrompt
     {
         $rows = array_map(fn ($event) => [
-            isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--',
+            $this->time($event),
             (string) ($event['entrypoint'] ?? '?'),
             $this->what($event),
             (string) ($event['duration_ms'] ?? ''),
@@ -233,7 +230,7 @@ class TailCommand extends Command
 
         while (true) {
             clearstatcache();
-            $newest = collect($this->sources()[0])->sortBy(fn ($path) => filemtime($path))->last();
+            $newest = collect($this->sources($this->days)[0])->sortBy(fn ($path) => filemtime($path))->last();
 
             if ($newest !== $file) {
                 // At start, skip what is printed already; a file that appears later, after the daily rollover, is read whole.
@@ -276,7 +273,7 @@ class TailCommand extends Command
         if (! isset($event['span_id'])
             || ($this->since !== null && strtotime((string) ($event['timestamp'] ?? '')) < $this->since)
             || ($this->option('errors') && Writer::level($event) !== LogLevel::ERROR)
-            || ($this->option('slow') && ($event['duration_ms'] ?? 0) <= config('jot.sampling.slow_ms', 1000))) {
+            || ($this->option('slow') && ! Writer::slow($event))) {
             return null;
         }
 
@@ -302,8 +299,14 @@ class TailCommand extends Command
             return;
         }
 
-        $time = isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--';
+        $this->line($this->time($event).'  '.($event['trace_id'] ?? '?').'  '.$this->summary($event));
+    }
 
-        $this->line("{$time}  ".($event['trace_id'] ?? '?').'  '.$this->summary($event));
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    protected function time(array $event): string
+    {
+        return isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--';
     }
 }

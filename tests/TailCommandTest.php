@@ -28,8 +28,17 @@ class FollowedTailCommand extends TailCommand
     }
 }
 
+/** Runs as if the output were a terminal. */
+class InteractiveTailCommand extends TailCommand
+{
+    protected function atTerminal(): bool
+    {
+        return $this->input->isInteractive();
+    }
+}
+
 /** Runs one queued closure before each read of the files. */
-class RefreshedTailCommand extends TailCommand
+class RefreshedTailCommand extends InteractiveTailCommand
 {
     /** @var list<Closure(): void> */
     public static array $reads = [];
@@ -40,6 +49,11 @@ class RefreshedTailCommand extends TailCommand
 
         return parent::recent($files, $limit);
     }
+}
+
+function atTerminal(): void
+{
+    app(Kernel::class)->registerCommand(app(InteractiveTailCommand::class));
 }
 
 function tailed(string $route, array $fields = []): void
@@ -141,6 +155,7 @@ it('warns when nothing matches', function () {
 });
 
 it('browses the events in a table', function () {
+    atTerminal();
     tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
     tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb', 'user.id' => 7]);
 
@@ -155,6 +170,7 @@ it('browses the events in a table', function () {
 });
 
 it('picks another event from the trace', function () {
+    atTerminal();
     $trace = str_repeat('t', 32);
     tailed('parent', ['trace_id' => $trace, 'span_id' => 'aaaaaaaaaaaaaaaa', 'user.id' => 7, 'timestamp' => now()->subMinute()->toIso8601String()]);
     tailed('child', ['trace_id' => $trace, 'span_id' => 'bbbbbbbbbbbbbbbb', 'parent_span_id' => 'aaaaaaaaaaaaaaaa']);
@@ -173,6 +189,7 @@ it('picks another event from the trace', function () {
 });
 
 it('goes back to the list to pick another event', function () {
+    atTerminal();
     tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
     tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb']);
 
@@ -233,12 +250,23 @@ it('refuses --interactive with --follow or --json', function () {
 });
 
 it('prints the plain list without an interactive input', function () {
+    atTerminal();
     tailed('home');
 
     $this->artisan('jot:tail', ['-i' => true, '--no-interaction' => true])->expectsOutputToContain('GET home 200')->assertSuccessful();
 });
 
+it('prints the plain list when the output is not a terminal', function () {
+    tailed('home');
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsOutputToContain('GET home 200')
+        ->doesntExpectOutputToContain('Recent events')
+        ->assertSuccessful();
+});
+
 it('searches the table by span ID, r typed as a letter', function () {
+    atTerminal();
     tailed('older', ['span_id' => 'aaaarrrraaaarrrr', 'timestamp' => now()->subMinute()->toIso8601String()]);
     tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb']);
 

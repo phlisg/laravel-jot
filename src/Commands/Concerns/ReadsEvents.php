@@ -5,9 +5,12 @@ namespace MarvelousDigital\WideEvents\Commands\Concerns;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use MarvelousDigital\WideEvents\Writer;
+use Symfony\Component\Console\Output\StreamOutput;
+
+use function Laravel\Prompts\select;
 
 /**
- * Reads the events back from the log files, for a command with a --days option.
+ * Reads the events back from the log files and browses them, for a console command.
  */
 trait ReadsEvents
 {
@@ -16,15 +19,15 @@ trait ReadsEvents
      *
      * @return array{list<string>, list<string>}
      */
-    protected function sources(): array
+    protected function sources(int $days): array
     {
         $files = [];
         $elsewhere = [];
-        $since = now()->subDays((int) $this->option('days'))->getTimestamp();
+        $since = now()->subDays($days)->getTimestamp();
 
         foreach (app(Writer::class)->outputs() as $output) {
             $channel = $output['channel'] ?? null;
-            $config = $channel === null ? ['driver' => 'daily', 'path' => storage_path('logs/jot.log')] : config("logging.channels.{$channel}");
+            $config = $channel === null ? ['driver' => 'daily', 'path' => Writer::defaultPath()] : config("logging.channels.{$channel}");
 
             if (! in_array($config['driver'] ?? null, ['single', 'daily'], true)) {
                 $elsewhere[] = $channel;
@@ -100,6 +103,17 @@ trait ReadsEvents
         }
 
         return collect($events);
+    }
+
+    /**
+     * The events of the trace, oldest first.
+     *
+     * @param  list<string>  $files
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function trace(array $files, string $traceId): Collection
+    {
+        return $this->find($files, $traceId)->where('trace_id', $traceId)->sortBy('timestamp')->values();
     }
 
     /**
@@ -179,5 +193,73 @@ trait ReadsEvents
             isset($event['duration_ms']) ? "{$event['duration_ms']}ms" : null,
             $error === null ? null : "<error>{$error}</error>",
         ]));
+    }
+
+    /**
+     * @param  list<string>  $files
+     */
+    protected function warnNothing(string $what, int $days, array $files): void
+    {
+        $this->components->warn("No {$what} in the last {$days} days of: ".($files ? implode(', ', $files) : 'no readable log file'));
+    }
+
+    /**
+     * @param  list<string>  $channels
+     */
+    protected function printElsewhere(array $channels, string $sentryHint): void
+    {
+        foreach ($channels as $channel) {
+            $this->line($channel === 'sentry_logs'
+                ? "<comment>{$sentryHint}</comment>"
+                : "<comment>Also written to the {$channel} channel, which {$this->getName()} cannot read.</comment>");
+        }
+    }
+
+    /**
+     * Whether a person is at the terminal: an interactive input, and an output that is a TTY.
+     */
+    protected function atTerminal(): bool
+    {
+        $output = $this->output->getOutput();
+
+        return $this->input->isInteractive() && $output instanceof StreamOutput && stream_isatty($output->getStream());
+    }
+
+    /**
+     * Lists the trace as the jot:query tree, the cursor on the span given, and returns the event picked.
+     *
+     * @param  list<string>  $files
+     * @return array<string, mixed>
+     */
+    protected function pick(array $files, string $traceId, ?string $span = null): array
+    {
+        $trace = $this->trace($files, $traceId);
+        // Prompts measures labels by length and styles them itself, so the console tags go.
+        $lines = array_map(fn ($line) => (string) preg_replace('#</?(comment|info|error)>#', '', $line), $this->tree($trace, $span));
+
+        $picked = select("Trace {$traceId}, {$trace->count()} event(s)", $lines, default: $span, scroll: min(10, count($lines)));
+
+        return $trace->firstWhere('span_id', (string) $picked) ?? $trace->first();
+    }
+
+    /**
+     * Prints every field of the event, then asks what next, picking again from the trace until another choice.
+     *
+     * @param  list<string>  $files
+     * @param  array<string, mixed>  $event
+     * @param  array<string, string>  $choices  the 'trace' key shows the trace
+     */
+    protected function inspect(array $files, array $event, array $choices): string
+    {
+        do {
+            $this->fields($event);
+            $next = (string) select('Next', $choices);
+
+            if ($next === 'trace') {
+                $event = $this->pick($files, (string) $event['trace_id'], $event['span_id']);
+            }
+        } while ($next === 'trace');
+
+        return $next;
     }
 }

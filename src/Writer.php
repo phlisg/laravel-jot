@@ -70,9 +70,19 @@ class Writer
         return match (true) {
             isset($event['error.type']), $status >= 500, ($event['job.status'] ?? null) === 'failed' => LogLevel::ERROR,
             $status >= 400, ! in_array($event['console.exit_code'] ?? $event['schedule.exit_code'] ?? 0, [0, null], true) => LogLevel::WARNING,
-            ($event['duration_ms'] ?? 0) > config('jot.sampling.slow_ms', 1000) => LogLevel::NOTICE,
+            static::slow($event) => LogLevel::NOTICE,
             default => LogLevel::INFO,
         };
+    }
+
+    public static function slow(array $event): bool
+    {
+        return ($event['duration_ms'] ?? 0) > config('jot.sampling.slow_ms', 1000);
+    }
+
+    public static function defaultPath(): string
+    {
+        return storage_path('logs/jot.log');
     }
 
     /**
@@ -102,10 +112,7 @@ class Writer
      */
     public function keep(array $event): bool
     {
-        if (($event['http.response.status_code'] ?? 0) >= 500
-            || ($event['job.status'] ?? null) === 'failed'
-            || isset($event['error.type'])
-            || ($event['duration_ms'] ?? 0) > config('jot.sampling.slow_ms', 1000)) {
+        if (static::level($event) === LogLevel::ERROR || static::slow($event)) {
             return true;
         }
 
@@ -135,7 +142,7 @@ class Writer
         // Built by hand: Laravel's channels append Context to "extra", which repeats the event's IDs.
         // The Laravel wrapper still fires MessageLogged, which Pail listens to.
         return $this->defaultChannel ??= new Logger(new Monolog('jot', [
-            (new RotatingFileHandler(storage_path('logs/jot.log'), 7))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
+            (new RotatingFileHandler(static::defaultPath(), 7))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
         ]), app('events'));
     }
 }
