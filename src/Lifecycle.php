@@ -12,8 +12,10 @@ use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
@@ -40,6 +42,8 @@ class Lifecycle
 {
     /** @var list<array{object, Jot, array, array}> the unit of work, then what it replaced */
     protected array $stack = [];
+
+    public function __construct(protected Application $app) {}
 
     public function register(Dispatcher $events): void
     {
@@ -151,7 +155,7 @@ class Lifecycle
 
         // Laravel reports a command's exception after CommandFinished: a failed outer command emits on terminate, with its error.
         if ($e->exitCode !== 0 && count($this->stack) === 1 && $this->top() === $e->input) {
-            $fill(app(Jot::class));
+            $this->inOwnApp(fn () => $fill(app(Jot::class)));
 
             return;
         }
@@ -211,11 +215,13 @@ class Lifecycle
 
     protected function push(object $unit): Jot
     {
-        $this->stack[] = [$unit, app(Jot::class), Context::all(), Context::allHidden()];
+        return $this->inOwnApp(function () use ($unit) {
+            $this->stack[] = [$unit, app(Jot::class), Context::all(), Context::allHidden()];
 
-        app()->instance(Jot::class, $jot = new Jot);
+            app()->instance(Jot::class, $jot = new Jot);
 
-        return $jot;
+            return $jot;
+        });
     }
 
     /**
@@ -232,13 +238,35 @@ class Lifecycle
 
         [, $previous, $context, $hidden] = array_pop($this->stack);
 
-        $jot = app(Jot::class);
-        $fill($jot);
-        $jot->emit();
+        $this->inOwnApp(function () use ($fill, $previous, $context, $hidden) {
+            $jot = app(Jot::class);
+            $fill($jot);
+            $jot->emit();
 
-        app()->instance(Jot::class, $previous);
-        Context::flush()->add($context)->addHidden($hidden);
-        $previous->tagSentry();
+            app()->instance(Jot::class, $previous);
+            Context::flush()->add($context)->addHidden($hidden);
+            $previous->tagSentry();
+        });
+    }
+
+    /**
+     * A command such as config:cache boots a fresh app, which becomes the global container until the process ends.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $callback
+     * @return T
+     */
+    protected function inOwnApp(Closure $callback): mixed
+    {
+        $current = Container::getInstance();
+        Container::setInstance($this->app);
+
+        try {
+            return $callback();
+        } finally {
+            Container::setInstance($current);
+        }
     }
 
     protected function top(): ?object

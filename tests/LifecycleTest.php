@@ -13,6 +13,7 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -315,6 +316,25 @@ it('writes argument and option names, never their values', function () {
     ])
         ->and(json_encode($event))->not->toContain('secret')->not->toContain('jane@example.com');
 });
+
+it('writes the event of a command that boots a fresh app, as config:cache does', function (int $exitCode) {
+    $app = app();
+    $input = new ArrayInput([]);
+    event(new CommandStarting('config:cache', $input, new NullOutput));
+
+    // `new Application` makes itself the global container.
+    Container::setInstance(new Container);
+
+    try {
+        $app['events']->dispatch(new CommandFinished('config:cache', $input, new NullOutput, $exitCode));
+    } finally {
+        Container::setInstance($app);
+    }
+
+    $app->terminate();
+
+    expect(emittedBy('console'))->toMatchArray(['console.command' => 'config:cache', 'console.exit_code' => $exitCode]);
+})->with([0, 1]);
 
 it('writes the event of a command that never finished, when the app terminates', function () {
     event(new CommandStarting('reports:send', new ArrayInput([]), new NullOutput));
