@@ -30,14 +30,14 @@ jobs:
     timeout-minutes: 5
     strategy:
       fail-fast: true
-      # The oldest supported versions with the lowest dependencies, a middle pair, and the newest.
+      # The oldest supported versions with the lowest dependencies, a middle pair, and the newest. Livewire 3 on the first two, 4 on the newest.
       matrix:
         include:
-          - { php: 8.3, laravel: 11.*, testbench: 9.*, stability: prefer-lowest }
-          - { php: 8.4, laravel: 12.*, testbench: 10.*, stability: prefer-stable }
-          - { php: 8.5, laravel: 13.*, testbench: 11.*, stability: prefer-stable }
+          - { php: 8.3, laravel: 11.*, testbench: 9.*, livewire: 3.*, stability: prefer-lowest }
+          - { php: 8.4, laravel: 12.*, testbench: 10.*, livewire: 3.*, stability: prefer-stable }
+          - { php: 8.5, laravel: 13.*, testbench: 11.*, livewire: 4.*, stability: prefer-stable }
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - LW${{ matrix.livewire }} - ${{ matrix.stability }}
 
     steps:
       - name: Checkout code
@@ -58,6 +58,7 @@ jobs:
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+          composer require --dev "livewire/livewire:${{ matrix.livewire }}" --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: List Installed Dependencies

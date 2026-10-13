@@ -2,6 +2,7 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use Composer\InstalledVersions;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\On;
@@ -54,7 +55,7 @@ function update(array $calls = [], array $updates = [], ?Testable $component = n
     $calls = array_map(fn ($params, $method) => ['path' => '', 'method' => $method, 'params' => $params], $calls, array_keys($calls));
 
     test()->withHeader('X-Livewire', 'true')
-        ->post(app('livewire')->getUpdateUri(), ['components' => [['snapshot' => json_encode($snapshot), 'calls' => $calls, 'updates' => $updates]]])
+        ->postJson(app('livewire')->getUpdateUri(), ['components' => [['snapshot' => json_encode($snapshot), 'calls' => $calls, 'updates' => $updates]]])
         ->assertOk();
 
     return lastEvent();
@@ -68,12 +69,12 @@ beforeEach(function () {
 it('writes the components, calls and updated paths, never the values', function () {
     $event = update(['pay' => []], ['email' => 'jane@example.com']);
 
-    expect($event)->toMatchArray([
-        'http.route' => 'default.livewire.update',
-        'livewire.components' => ['checkout'],
-        'livewire.calls' => ['checkout::pay'],
-        'livewire.updates' => ['email'],
-    ])
+    expect($event['http.route'])->toEndWith('livewire.update')
+        ->and($event)->toMatchArray([
+            'livewire.components' => ['checkout'],
+            'livewire.calls' => ['checkout::pay'],
+            'livewire.updates' => ['email'],
+        ])
         ->and($event)->toHaveKey('livewire.page')
         ->and(json_encode($event))->not->toContain('jane@example.com');
 });
@@ -115,3 +116,33 @@ it('never writes call parameters or event payloads', function () {
     expect($event)->toMatchArray(['livewire.calls' => ['checkout::applyCoupon'], 'livewire.events' => ['cart-updated']])
         ->and(json_encode($event))->not->toContain('SECRET-COUPON')->not->toContain('tok_secret');
 });
+
+/**
+ * A wire:poll request, as Livewire 4 sends it.
+ */
+function poll(): void
+{
+    test()->withHeader('X-Livewire', 'true')
+        ->postJson(app('livewire')->getUpdateUri(), ['components' => [[
+            'snapshot' => json_encode(Livewire::test('checkout')->snapshot),
+            'calls' => [['path' => '', 'method' => '$refresh', 'params' => [], 'metadata' => ['type' => 'poll']]],
+            'updates' => [],
+        ]]])
+        ->assertOk();
+}
+
+describe('Livewire 4', function () {
+    it('marks a poll', function () {
+        config(['jot.sampling.drop_livewire_polls' => false]);
+
+        poll();
+
+        expect(lastEvent())->toMatchArray(['livewire.poll' => true])->not->toHaveKey('livewire.calls');
+    });
+
+    it('drops polls by default', function () {
+        poll();
+
+        expect(app(Writer::class)->faked)->toBe([]);
+    });
+})->skip(fn () => version_compare(InstalledVersions::getVersion('livewire/livewire'), '4.0.0', '<'), 'Livewire 3 sends a poll as a normal call.');

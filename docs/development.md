@@ -43,7 +43,17 @@ PHP_VERSION=8.5 ./dev pest
 
 > Run `composer update` after switching versions. `composer.lock` is git-ignored, and a lock resolved on one PHP version can fail on another.
 
-The GitHub Actions workflow covers PHP 8.3 to 8.5 and Laravel 11 to 13.
+The GitHub Actions workflow covers PHP 8.3 to 8.5, Laravel 11 to 13, and Livewire 3 and 4.
+
+`composer update` installs Livewire 4. To run the suite on Livewire 3, then go back:
+
+```sh
+./dev composer update livewire/livewire --with "livewire/livewire:^3.6" -W
+./dev pest
+./dev composer update livewire/livewire
+```
+
+Tests for Livewire 4 only, such as `livewire.poll`, are skipped on Livewire 3.
 
 ## Workbench
 
