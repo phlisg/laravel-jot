@@ -2,6 +2,7 @@
 
 namespace MarvelousDigital\WideEvents\Sections;
 
+use LogicException;
 use MarvelousDigital\WideEvents\Attributes\Key;
 use MarvelousDigital\WideEvents\Section;
 
@@ -10,17 +11,16 @@ use MarvelousDigital\WideEvents\Section;
  */
 final class LivewireSection extends Section
 {
-    public const MAX = 10;
+    private const MAX_LIST_SIZE = 10;
 
     // The path of the page the components sit on.
     public ?string $page = null;
 
+    // Lists of names: component::method in calls, wire:model paths in updates.
     public ?array $components = null;
 
-    // component::method
     public ?array $calls = null;
 
-    // wire:model paths
     public ?array $updates = null;
 
     public ?array $events = null;
@@ -38,13 +38,17 @@ final class LivewireSection extends Section
     public ?string $filamentAction = null;
 
     /**
-     * Adds a value to a list once, up to MAX: one request can carry many components.
+     * Adds a value to a list once, up to MAX_LIST_SIZE: one request can carry many components.
      */
     public function remember(string $list, string $value): void
     {
+        if (! property_exists($this, $list)) {
+            throw new LogicException("LivewireSection has no list {$list}.");
+        }
+
         $values = $this->{$list} ?? [];
 
-        if (count($values) < self::MAX && ! in_array($value, $values, true)) {
+        if (count($values) < self::MAX_LIST_SIZE && ! in_array($value, $values, true)) {
             $this->{$list} = [...$values, $value];
         }
     }
