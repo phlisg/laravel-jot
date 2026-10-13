@@ -21,3 +21,33 @@ it('prints the trace ID with @traceId', function () {
 
     expect($response->getContent())->toBe('Reference: '.$response->headers->get('X-Request-Id'));
 });
+
+it("leaves an app's own 500 page alone", function () {
+    config(['app.debug' => false]);
+    Route::get('/boom', fn () => throw new RuntimeException('boom'));
+    $page = resource_path('views/errors/500.blade.php');
+    file_put_contents($page, 'Our own error page');
+
+    try {
+        $this->get('/boom')->assertStatus(500)->assertSee('Our own error page')->assertDontSee('Reference');
+    } finally {
+        unlink($page);
+    }
+});
+
+it("leaves Laravel's 500 page alone with JOT_ERROR_PAGE=false", function () {
+    putenv('JOT_ERROR_PAGE=false');
+    $_ENV['JOT_ERROR_PAGE'] = $_SERVER['JOT_ERROR_PAGE'] = 'false';
+
+    try {
+        $this->refreshApplication();
+    } finally {
+        putenv('JOT_ERROR_PAGE');
+        unset($_ENV['JOT_ERROR_PAGE'], $_SERVER['JOT_ERROR_PAGE']);
+    }
+
+    config(['app.debug' => false]);
+    Route::get('/boom', fn () => throw new RuntimeException('boom'));
+
+    $this->get('/boom')->assertStatus(500)->assertSee('Server Error')->assertDontSee('Reference');
+});
