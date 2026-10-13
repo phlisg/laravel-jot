@@ -114,6 +114,17 @@ it('prints a trace as a tree', function () {
         ->assertSuccessful();
 });
 
+it('prints every field of the only event in a trace', function () {
+    $trace = str_repeat('a', 32);
+    logged('home', ['trace_id' => $trace, 'user.id' => 7]);
+
+    $this->artisan('jot:query', ['id' => $trace])
+        ->expectsOutputToContain('GET home 200')
+        ->expectsOutputToContain('user.id')
+        ->doesntExpectOutputToContain('Run jot:query with a span ID')
+        ->assertSuccessful();
+});
+
 it('prints every field of a span, in its trace', function () {
     [$trace, $job] = requestWithJob();
 

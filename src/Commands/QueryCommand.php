@@ -114,6 +114,7 @@ class QueryCommand extends Command
         $span = strlen($id) === 16 ? $this->find($files, $id)->firstWhere('span_id', $id) : null;
         $trace = $span['trace_id'] ?? $id;
         $events = $this->trace($files, $trace);
+        $span ??= $events->count() === 1 ? $events->first() : null;
 
         if ($events->isEmpty()) {
             $this->warnNothing("event with ID {$id}", $days, $files);

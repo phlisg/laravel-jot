@@ -43,6 +43,7 @@ At a terminal, `jot:query` opens an interactive table, see [Browsing](#browsing)
    └─ queue  73e837d98f1733c0  ChargeCard failed  9ms  RuntimeException: Card network timeout
    Run jot:query with a span ID for every field of that event.
    ```
+   A trace with a single event prints every field of it, as in step 3.
 3. Print every field of one event with its span ID. The tree comes first, `◀` marks the event:
    ```sh
    php artisan jot:query 73e837d98f1733c0
