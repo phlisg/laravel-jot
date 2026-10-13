@@ -26,6 +26,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
   - [Levels](#levels)
   - [Output levels](#output-levels)
   - [Sampling](#sampling)
+  - [Rules](#rules)
   - [Recommendations](#recommendations)
   - [Business outcomes](#business-outcomes)
 - [Sentry and GlitchTip](#sentry-and-glitchtip)
@@ -56,7 +57,7 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 - Automatic fields: user, hashed session, login outcome, HTTP details, errors, duration, database usage.
 - Typed section classes that define the log schema.
 - Backed enums for fields with a fixed set of values.
-- Tail sampling: keep every error and slow request, sample the rest.
+- Tail sampling: keep every error, slow event and event raised with `jot()->level()`. Local runs keep everything, other environments 1% of 4xx and none of the rest.
 - Strict mode that warns on fields outside the schema.
 - Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
 - `jot:query`: reads events back from the log files, by trace, by filter or in an interactive table.
@@ -214,7 +215,7 @@ http  f56220033574661e  POST checkout.store 200  412ms
 
 - Trace ID (32 hex characters): prints the whole trace. The `X-Request-Id` response header holds it.
 - Span ID (16 hex characters): prints the same tree, then every field of that event.
-- `--days=7`: how many days of files to read.
+- `--days`: how many days of files to read, `jot.days` (7) by default.
 - `--json`: one JSON line per event.
 
 At a terminal, a trace with several events opens as a list laid out as the tree. Enter on an event prints every field, then offers Back to the trace or Quit. A span ID, or a trace with a single event, prints the tree as above.
@@ -226,6 +227,9 @@ Every setting lives in `config/jot.php`. The file lists each feature with its de
 ```php
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 
+// Local and test runs keep every event; other environments keep what helps debug an incident.
+$local = in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);
+
 return [
 
     'enabled' => env('JOT_ENABLED', true),
@@ -236,6 +240,9 @@ return [
         // level: optional, the lowest event level this output writes.
         ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
     ],
+
+    // Days of files the default output keeps, one file per day.
+    'days' => env('JOT_DAYS', 7),
 
     // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
     // Events below this level stay out of Sentry: error, warning, notice or info.
@@ -301,16 +308,30 @@ return [
         'ignore' => [
             'queue:work', 'queue:listen', 'horizon*', 'octane:*', 'reverb:start',
             'schedule:run', 'schedule:work', 'pail', 'tinker', 'jot:*', 'help', 'list',
+            // Composer hooks and dev tools.
+            'package:discover', 'vendor:publish', 'ide-helper:*', 'boost:*', 'filament:upgrade', 'test',
         ],
     ],
 
     // Logs a warning for each string key written outside a section.
     'strict' => env('JOT_STRICT', false),
 
+    // See "Levels and volume" in the README.
     'sampling' => [
-        // Share of normal events to keep, from 0.0 to 1.0. Errors and slow events are always kept.
-        'rate' => env('JOT_SAMPLE_RATE', 1.0),
+        // Share of normal events to keep, from 0.0 to 1.0. Errors, slow events, failed commands
+        // and events raised with jot()->level() are always kept.
+        'rate' => env('JOT_SAMPLE_RATE', $local ? 1.0 : 0.0),
+        // Share of 4xx responses to keep.
+        'client_errors' => env('JOT_SAMPLE_CLIENT_ERRORS', $local ? 1.0 : 0.01),
         'slow_ms' => 1000,
+        // Most always-kept events written per minute for each level, error type and route. null: no limit.
+        'max_per_minute' => env('JOT_MAX_PER_MINUTE', 10),
+        // Livewire updates that only poll or refresh a component.
+        'drop_livewire_polls' => true,
+        // Events never written unless always kept. Same patterns as jot:query --where: * wildcards, commas for OR.
+        'drop' => [
+            ['http.route' => 'boost.*,debugbar.*,telescope*,horizon.*'],
+        ],
     ],
 
 ];
@@ -318,12 +339,22 @@ return [
 
 Settings that need a decision per app:
 
-- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Levels and volume](#levels-and-volume).
-- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the `traceparent` and `X-Request-Id` headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
-- `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
-- `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
-- `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
-- `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%. See [Levels and volume](#levels-and-volume) for the choices per environment.
+| Setting | Default | Change it when |
+|---|---|---|
+| `outputs` | a daily JSON file | logs go to a log backend. See [Output shapes](#output-shapes) |
+| `days` | `7` | the server disk is small or large |
+| `sampling.rate` | `1.0` local, `0.0` elsewhere | you need every request, for example while a tester follows a session |
+| `sampling.client_errors` | `1.0` local, `0.01` elsewhere | 4xx responses matter more or less |
+| `sampling.max_per_minute` | `10` | an outage needs more examples per error |
+| `sampling.drop` | dev tool routes | other noise fills the log. See [Rules](#rules) |
+| `trace.trust_incoming` | `false` | a proxy sets or strips `traceparent` and `X-Request-Id` |
+| `app.version` | none | you deploy: set a commit hash or release tag |
+| `fields.client.ip` | `anonymized` | you have a legal basis under the GDPR for `full` |
+| `fields.query.allow` | empty | you want marketing keys such as `utm_*`. Never tokens |
+
+Use a JSON formatter on each output channel, so the log backend can index each field. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`, a trusted `X-Request-Id` goes to `http.request.header.x-request-id`. Errors, slow events, failed commands and events raised with `jot()->level()` are kept whatever the rates, see [Levels and volume](#levels-and-volume).
+
+> Upgrade: Laravel merges only the top-level keys of a published config, so an older `config/jot.php` keeps its old `sampling` and `console` keys. Republish it with `php artisan vendor:publish --tag=jot-config --force`, then reapply the app's changes.
 
 ## Sections
 
@@ -633,19 +664,17 @@ Each list holds up to 10 distinct entries. The first page load writes a plain HT
 
 ### Polling
 
-A component with `wire:poll` sends a request every few seconds while the page stays open, and each request writes an event. A `dropWhen` rule keeps them out of the logs, see [Sampling](#sampling). On Livewire 3 or 4, match the polled method:
+Jot drops the requests of `wire:poll` by default, so most apps need nothing. Errors, slow polls and events raised with `jot()->level()` are still kept.
+
+- Livewire 4: every poll is dropped.
+- Livewire 3 and 4: the loads of `#[Lazy]` components are dropped too.
+- Livewire 3: a poll that only refreshes is dropped. A poll that calls a method, such as `wire:poll="checkStatus"`, looks like a click and is kept. Drop it with a [rule](#rules), `*` on both sides because `livewire.calls` is a list:
 
 ```php
-Jot::dropWhen(fn (array $event) => ($event['livewire.calls'] ?? null) === ['registration-form::checkStatus']);
+Jot::dropWhen(['livewire.calls' => '*::checkStatus*']);
 ```
 
-On Livewire 4 only, `livewire.poll` marks every poll:
-
-```php
-Jot::dropWhen(fn (array $event) => $event['livewire.poll'] ?? false);
-```
-
-Errors and slow polls are still kept.
+To keep every poll, set `sampling.drop_livewire_polls` to `false` in `config/jot.php`. Detection reads the Livewire fields, so it needs `fields.livewire` on.
 
 ## Example: paid event booking
 
@@ -701,9 +730,9 @@ try {
 
 ## Levels and volume
 
-Jot sets the level of each event from its fields, so the app never sets one. To limit volume, give a minimum level to paid or noisy outputs, and lower the sampling rate only when the main log costs too much.
+Jot sets the level of each event from its fields, and sampling decides which events to write. Outside the `local` and `testing` environments, Jot writes only what helps debug an incident: errors, slow events, failed commands, events the app raised, and 1% of 4xx responses. Give a minimum level to paid or noisy outputs.
 
-A wide event describes how a request, job, command or scheduled task ended, so the package has no `jot()->info()` or `jot()->error()`.
+A wide event describes how a request, job, command or scheduled task ended, so the package has no `jot()->info()` or `jot()->error()`. To mark an event as worth reading, the app raises its level with `jot()->level()`, see [Business outcomes](#business-outcomes).
 
 ### Levels
 
@@ -713,6 +742,8 @@ A wide event describes how a request, job, command or scheduled task ended, so t
 | `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
 | `notice` | slower than `sampling.slow_ms` |
 | `info` | every other event |
+
+`jot()->level()` can raise an event above the level its fields give, never lower it.
 
 The level is a standard Monolog level on the log line, so a log backend can filter on it too.
 
@@ -733,39 +764,100 @@ An optional `level` key on an `outputs` entry writes only events at that level o
 
 ### Sampling
 
-The package decides at emit time whether to write the event (tail sampling). Sampling runs before every output, so a dropped event reaches none of them. It keeps:
+The package decides at emit time whether to write the event (tail sampling). Sampling runs before every output, so a dropped event reaches none of them. It checks, in this order:
 
-- Every event with `http.response.status_code` of 500 or more, a failed job, or an `error.type`.
-- Every event slower than `sampling.slow_ms`.
-- Every event where a `keepWhen` rule returns `true`, for example enterprise customers.
-- A random `sampling.rate` share of all other events.
+1. Always kept, whatever the rate or a drop rule says:
+   - level `error`: an `error.type`, a status of 500 or more, a failed job
+   - slower than `sampling.slow_ms`
+   - a failed command or scheduled task (non-zero exit code)
+   - an event raised with `jot()->level()`
+2. Error storm cap: always-kept events of one kind past `sampling.max_per_minute` (10) in the current minute are dropped. A kind is the level, the `error.type` and the route (`http.route`, else `job.name`, `console.command` or `schedule.task`).
+3. Drops: a Livewire poll (see [Polling](#polling)), a pattern in `sampling.drop`, a `dropWhen` rule.
+4. Keeps: a `keepWhen` rule keeps an event that no drop matched, whatever the rate.
+5. Rates: a random `sampling.client_errors` share of 4xx responses, a random `sampling.rate` share of all other events.
 
-A `dropWhen` rule removes events that are frequent and alike, such as a health check or a page that polls the server every few seconds. It wins over `keepWhen` and `sampling.rate`. Errors and slow events are still kept.
+The cap protects the disk during an outage. When the database goes down, every request becomes an error, and without a cap each one writes an event. The cap counts in the app's default cache store, so a file cache on shared hosting works. When the cache fails, the event is kept. On a file or database cache the count has no lock, so the cap is approximate under load. `JOT_MAX_PER_MINUTE=null` removes the cap.
 
-Register rules in a service provider:
+`sampling.drop` ships with a pattern for dev tool routes: Laravel Boost, Debugbar, Telescope and Horizon. These drops apply in every environment.
+
+### Rules
+
+A rule picks events by their fields. It takes patterns or a closure.
+
+Patterns use the syntax of `jot:query --where`:
+
+- Each key must match.
+- `*` is a wildcard. Commas list alternatives: `'boost.*,horizon.*'`.
+- A missing field never matches. An empty pattern list, `[]`, matches no event.
+- A value other than a string is compared as JSON: `true`, `419`, `["a::b"]`.
+
+Find the noise first, then drop it with the same pattern:
+
+1. Run `php artisan jot:query --where=http.route=boost.*` and check that it lists only the noise.
+2. Add the pattern to `sampling.drop` in `config/jot.php`:
+   ```php
+   'drop' => [
+       ['http.route' => 'boost.*,debugbar.*,telescope*,horizon.*'],
+   ],
+   ```
+
+`keepWhen` and `dropWhen` take the same patterns, or a closure for what a pattern cannot express, such as a number comparison. Register them in a service provider. Closures stay out of `config/jot.php`, because `php artisan config:cache` cannot serialize them.
 
 ```php
-Jot::keepWhen(fn (array $event) => ($event['user.plan'] ?? null) === 'enterprise');
-Jot::dropWhen(fn (array $event) => ($event['http.route'] ?? null) === 'health');
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use MarvelousDigital\WideEvents\Facades\Jot;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        // The uptime monitor's health check.
+        Jot::dropWhen(['http.route' => 'health']);
+
+        // Every event of enterprise customers, at any rate.
+        Jot::keepWhen(['user.plan' => 'enterprise']);
+
+        // Requests with more than 100 queries, to find N+1 problems.
+        Jot::keepWhen(fn (array $event) => ($event['db.query_count'] ?? 0) > 100);
+    }
+}
 ```
+
+Drop rules (`sampling.drop`, the Livewire poll drop, `dropWhen`) win over `keepWhen`. Neither touches an always-kept event.
 
 ### Recommendations
 
-- Local and staging: keep everything. `sampling.rate` stays at `1.0`, no output has a `level`.
-- Production, main log (file or log backend): keep everything. Lower `JOT_SAMPLE_RATE` only when the volume costs too much.
-- Production, paid or noisy outputs: set a level, for example `JOT_SENTRY_LEVEL=warning` for Sentry Logs and `error` for an alert channel.
+- Local: keep everything. The defaults set `sampling.rate` and `sampling.client_errors` to `1.0`.
+- Staging, preproduction and production: keep errors, slow events, failed commands, raised events and 1% of 4xx responses. This is the default outside `local` and `testing`.
+- Staging, to follow a full session: set `JOT_SAMPLE_RATE=1.0` for the test, then remove it.
+- Paid or noisy outputs: set a level, for example `JOT_SENTRY_LEVEL=warning` for Sentry Logs and `error` for an alert channel.
 
-A level filter drops the context around a failure: the earlier requests of the same user, and the normal traffic to compare with. Sampling keeps a representative share of that traffic.
+The defaults fit shared or managed servers with 20 to 100 GB of disk, often running staging, preproduction and production side by side, where logs are read only to debug an incident. An event averages about 950 bytes. At 10 million requests a day:
+
+- everything: about 10 GB a day
+- errors, slow and raised events (say 1%): about 100 MB a day
+
+`days` multiplies these figures: 7 days of everything is about 70 GB.
 
 ### Business outcomes
 
-An outcome that matters to the app can end with the level `info`, such as a declined payment with a 200 response. A `keepWhen` rule keeps it at any sampling rate:
+An outcome that matters to the app can end with the level `info`, such as a declined payment with a 200 response. `jot()->level()` raises its level, so sampling keeps it and output `level` filters see it:
 
 ```php
-Jot::keepWhen(fn (array $event) => ($event['payment.status'] ?? null) === 'declined');
+use Psr\Log\LogLevel;
+
+jot()->level(LogLevel::WARNING, 'payment declined');
 ```
 
-The level stays `info`, so an output with a `level` key still skips the event.
+- The level takes a `Psr\Log\LogLevel` constant. An unknown level name is ignored.
+- The event gets the fields `level.raised`, in lowercase, and `level.reason`. The reason is optional.
+- Each raise replaces `level.reason`. A raise without a reason clears it.
+- A lower level in a later call is ignored. A 500 response stays `error`.
+- Sampling keeps the event even when a drop rule matches it.
 
 ## Sentry and GlitchTip
 
@@ -785,7 +877,7 @@ JOT_SENTRY_LEVEL=warning
 
 `JOT_SENTRY_LEVEL` sets the lowest [level](#levels) that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off the logs, the tags and the "Jot" context.
 
-> Only sampled events reach Sentry, see [Sampling](#sampling).
+> Only events that sampling keeps reach Sentry, see [Sampling](#sampling).
 
 > The SDK's own `SENTRY_LOG_LEVEL` (default: `LOG_LEVEL`) filters the same channel for every log line of the app. Keep it at or below `JOT_SENTRY_LEVEL`.
 

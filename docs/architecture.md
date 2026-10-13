@@ -5,7 +5,7 @@ How Jot collects fields during a unit of work and writes them as one event. For 
 ## Classes
 
 - `Jot`: the accumulator. Holds the fields and sections of the current request, job, command or scheduled task. Bound as scoped, so the container drops it at each new request (including under Laravel Octane) and each new job.
-- `Writer`: singleton. Samples each event and writes it to the outputs. Holds what must outlive the accumulator: `keepWhen` and `dropWhen` rules, the `Jot::user()` callback and the fake used by `Jot::fake()`.
+- `Writer`: singleton. Samples each event, with the patterns of `sampling.drop` and the app's rules, and writes it to the outputs. Holds what must outlive the accumulator: `keepWhen` and `dropWhen` rules, the `Jot::user()` callback and the fake used by `Jot::fake()`.
 - `Lifecycle`: singleton. Listens to queue, console, scheduler, auth and performance events. Starts and emits the event of each job, command and scheduled task.
 - `LivewireListener`: listens to Livewire's hooks and fills `Sections\LivewireSection` on update requests. `Lifecycle` registers it.
 - `Middleware\JotRequest`: global HTTP middleware. Starts the request event in `handle()`, emits it in `terminate()`.
