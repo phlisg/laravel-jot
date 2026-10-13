@@ -166,15 +166,12 @@ class TailCommand extends Command
         while (true) {
             $event = $events[datatable(['Time', 'Type', 'What', 'ms', 'Error'], $rows, scroll: min(10, count($rows)), label: 'Recent events', hint: '/ searches, IDs included; Enter shows every field', filter: $filter)];
 
-            $this->fields($event);
-
             do {
+                $this->fields($event);
                 $next = select('Next', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit']);
 
                 if ($next === 'trace') {
-                    $trace = $this->find($files, (string) $event['trace_id'])->where('trace_id', $event['trace_id'])->sortBy('timestamp')->values();
-                    $this->line("Trace <info>{$event['trace_id']}</info>, {$trace->count()} event(s)");
-                    $this->tree($trace, null, '', $event['span_id']);
+                    $event = $this->pick($files, $event);
                 }
             } while ($next === 'trace');
 
@@ -182,6 +179,24 @@ class TailCommand extends Command
                 return;
             }
         }
+    }
+
+    /**
+     * Lists the event's trace as the jot:query tree, the cursor on the event, and returns the event picked.
+     *
+     * @param  list<string>  $files
+     * @param  array<string, mixed>  $event
+     * @return array<string, mixed>
+     */
+    protected function pick(array $files, array $event): array
+    {
+        $trace = $this->find($files, (string) $event['trace_id'])->where('trace_id', $event['trace_id'])->sortBy('timestamp')->values();
+        // Prompts measures labels by length and styles them itself, so the console tags go.
+        $lines = array_map(fn ($line) => (string) preg_replace('#</?(comment|info|error)>#', '', $line), $this->tree($trace, $event['span_id']));
+
+        $span = select("Trace {$event['trace_id']}, {$trace->count()} event(s)", $lines, default: $event['span_id'], scroll: min(10, count($lines)));
+
+        return $trace->firstWhere('span_id', (string) $span) ?? $event;
     }
 
     /**
