@@ -155,8 +155,16 @@ class TailCommand extends Command
             Str::limit((string) $this->errorMessage($event), 60),
         ], $events);
 
+        // The filter gets the row without its key, so the IDs are looked up by the row's text; identical rows share them.
+        $ids = [];
+        foreach ($rows as $i => $row) {
+            $key = implode("\0", $row);
+            $ids[$key] = ($ids[$key] ?? '').' '.($events[$i]['trace_id'] ?? '').' '.$events[$i]['span_id'];
+        }
+        $filter = fn (array $row, string $query) => str_contains(mb_strtolower(implode(' ', $row).$ids[implode("\0", $row)]), mb_strtolower($query));
+
         while (true) {
-            $event = $events[datatable(['Time', 'Type', 'What', 'ms', 'Error'], $rows, scroll: min(10, count($rows)), label: 'Recent events', hint: 'Enter shows every field')];
+            $event = $events[datatable(['Time', 'Type', 'What', 'ms', 'Error'], $rows, scroll: min(10, count($rows)), label: 'Recent events', hint: '/ searches, IDs included; Enter shows every field', filter: $filter)];
 
             $this->fields($event);
 
