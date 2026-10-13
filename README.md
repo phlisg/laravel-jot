@@ -18,6 +18,7 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
   - [Production checklist](#production-checklist)
 - [Debugging an incident](#debugging-an-incident)
   - [Trace ID on the error page](#trace-id-on-the-error-page)
+  - [Trace ID in views](#trace-id-in-views)
 - [Troubleshooting](#troubleshooting)
   - [No events for normal requests outside local](#no-events-for-normal-requests-outside-local)
   - [jot:query finds nothing](#jotquery-finds-nothing)
@@ -196,15 +197,39 @@ To change a default, run `php artisan jot:install`. It publishes the config file
 
 A user or tester sees the error page, never the response header. Jot adds the trace ID to Laravel's default 500 page, so a bug report can quote it: "Reference: 4bf92f35…". It shows only with `APP_DEBUG=false`, since debug mode shows Laravel's debug page instead.
 
-An app with its own `resources/views/errors/500.blade.php` keeps it unchanged. Add the ID there with the `@traceId` Blade directive:
-
-```blade
-@if (jot()->traceId())
-    <p>Reference: @traceId</p>
-@endif
-```
+An app with its own `resources/views/errors/500.blade.php` keeps it unchanged. Add the ID there with `@traceId`, see [Trace ID in views](#trace-id-in-views).
 
 `JOT_ERROR_PAGE=false` leaves Laravel's default page as it is.
+
+### Trace ID in views
+
+The `@traceId` Blade directive prints the trace ID of the running event, escaped, or nothing when no event runs. It is the same ID as the `X-Request-Id` header and the `trace_id` field. A person who quotes it gives you the argument of `php artisan jot:query <trace_id>`.
+
+Places to print it:
+
+- The app's own error pages: `500.blade.php`, and the 403, 419 or 429 pages it customizes. Jot's default page covers 500 only.
+  ```blade
+  @if (jot()->traceId())
+      <p>Reference: @traceId</p>
+  @endif
+  ```
+- A support or contact form: a hidden field, so the ticket carries the trace of the page that rendered the form. Submitting the form is a new request with its own trace. The trace also holds the jobs that page dispatched, so a failed export or payment shows up.
+  ```blade
+  <input type="hidden" name="trace_id" value="@traceId">
+  ```
+- A footer on staging, so testers quote the ID in bug reports.
+  ```blade
+  @env('staging')
+      <footer>Trace @traceId</footer>
+  @endenv
+  ```
+- A `<meta>` tag, which frontend JavaScript error reporting reads and attaches to its reports.
+  ```blade
+  <meta name="trace-id" content="@traceId">
+  ```
+- A mail or notification view rendered in a queued job: it prints the job's trace, which is the trace of the request that dispatched the job.
+
+> Outside `local`, sampling keeps errors and slow events, 1% of 4xx responses and no other events, see [Sampling](#sampling). An ID quoted from a 403, 419 or 429 page, or from a successful page, usually finds nothing. To find every event on staging, set `JOT_SAMPLE_RATE=1.0` and `JOT_SAMPLE_CLIENT_ERRORS=1.0` there.
 
 ## Troubleshooting
 

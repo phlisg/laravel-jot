@@ -51,6 +51,8 @@ HTTP:
 
 The route is read in `terminate()`: global middleware runs before routing.
 
+Error page: with `jot.error_page` on, the service provider appends `resources/views` to `view.paths`. Laravel's `RegisterErrorViewPaths` looks for an error view in `errors/` under each view path in order, then in its own views, so the app's `errors/500.blade.php` comes first and Jot's page replaces only Laravel's default.
+
 Queue:
 
 1. On dispatch, Laravel copies Context into the job payload (key `illuminate:log:context`).
