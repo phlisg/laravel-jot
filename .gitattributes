@@ -20,3 +20,6 @@
 /phpstan-baseline.neon  export-ignore
 /Dockerfile         export-ignore
 /compose.yaml       export-ignore
+/AGENTS.md          export-ignore
+/bin                export-ignore
+/dev                export-ignore
