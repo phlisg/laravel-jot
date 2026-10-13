@@ -488,7 +488,7 @@ jot()->raise(LogLevel::WARNING, 'payment declined');
 
 - The level takes a `Psr\Log\LogLevel` constant. An unknown level name is ignored.
 - The event gets the fields `level.raised`, in lowercase, and `level.reason`. The reason is optional.
-- Each raise replaces `level.reason`. A raise without a reason clears it.
+- A call at a higher level replaces `level.reason`, and clears it when it has no reason. A call at the same or a lower level changes nothing.
 - A lower level in a later call is ignored. A 500 response stays `error`.
 - Output `level` filters see the raised level.
 
