@@ -3,8 +3,6 @@
 namespace MarvelousDigital\WideEvents\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -45,8 +43,7 @@ class QueryCommand extends Command
 
             if ($span) {
                 $this->newLine();
-                $this->components->twoColumnDetail('<info>'.$span['span_id'].'</info>');
-                collect(Arr::dot($span))->each(fn ($value, $key) => $this->components->twoColumnDetail($key, is_string($value) ? $value : json_encode($value)));
+                $this->fields($span);
             } else {
                 $this->line('<comment>Run jot:query with a span ID for every field of that event.</comment>');
             }
@@ -59,48 +56,5 @@ class QueryCommand extends Command
         }
 
         return $events->isEmpty() ? self::FAILURE : self::SUCCESS;
-    }
-
-    /**
-     * The events on the lines that contain the needle, flattened, one per span.
-     *
-     * @param  list<string>  $files
-     * @return Collection<array-key, array<string, mixed>>
-     */
-    protected function find(array $files, string $needle): Collection
-    {
-        /** @var array<array-key, array<string, mixed>> $events */
-        $events = [];
-
-        // Line by line: a daily file can hold hundreds of megabytes.
-        foreach ($files as $file) {
-            foreach (new \SplFileObject($file) as $line) {
-                if (is_string($line) && str_contains($line, $needle) && isset(($event = $this->decode($line))['span_id'])) {
-                    $events[$event['span_id']] = $event;
-                }
-            }
-        }
-
-        return collect($events);
-    }
-
-    /**
-     * @param  Collection<int, array<string, mixed>>  $events
-     */
-    protected function tree(Collection $events, ?string $parent, string $indent, ?string $marked): void
-    {
-        $spans = $events->pluck('span_id')->all();
-        $children = $events->filter(fn ($event) => $parent === null
-            ? ! in_array($event['parent_span_id'] ?? null, $spans, true)
-            : ($event['parent_span_id'] ?? null) === $parent);
-
-        foreach ($children->values() as $i => $event) {
-            $last = $i === $children->count() - 1;
-            $branch = $parent === null ? '' : ($last ? '└─ ' : '├─ ');
-            $mark = $event['span_id'] === $marked ? ' <info>◀</info>' : '';
-
-            $this->line($indent.$branch.$this->summary($event).$mark);
-            $this->tree($events, $event['span_id'], $parent === null ? '' : $indent.($last ? '   ' : '│  '), $marked);
-        }
     }
 }

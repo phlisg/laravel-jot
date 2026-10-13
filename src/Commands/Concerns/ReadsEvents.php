@@ -3,6 +3,7 @@
 namespace MarvelousDigital\WideEvents\Commands\Concerns;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use MarvelousDigital\WideEvents\Writer;
 
 /**
@@ -79,9 +80,65 @@ trait ReadsEvents
     }
 
     /**
+     * The events on the lines that contain the needle, flattened, one per span.
+     *
+     * @param  list<string>  $files
+     * @return Collection<array-key, array<string, mixed>>
+     */
+    protected function find(array $files, string $needle): Collection
+    {
+        /** @var array<array-key, array<string, mixed>> $events */
+        $events = [];
+
+        // Line by line: a daily file can hold hundreds of megabytes.
+        foreach ($files as $file) {
+            foreach (new \SplFileObject($file) as $line) {
+                if (is_string($line) && str_contains($line, $needle) && isset(($event = $this->decode($line))['span_id'])) {
+                    $events[$event['span_id']] = $event;
+                }
+            }
+        }
+
+        return collect($events);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $events
+     */
+    protected function tree(Collection $events, ?string $parent, string $indent, ?string $marked): void
+    {
+        $spans = $events->pluck('span_id')->all();
+        $children = $events->filter(fn ($event) => $parent === null
+            ? ! in_array($event['parent_span_id'] ?? null, $spans, true)
+            : ($event['parent_span_id'] ?? null) === $parent);
+
+        foreach ($children->values() as $i => $event) {
+            $last = $i === $children->count() - 1;
+            $branch = $parent === null ? '' : ($last ? '└─ ' : '├─ ');
+            $mark = $event['span_id'] === $marked ? ' <info>◀</info>' : '';
+
+            $this->line($indent.$branch.$this->summary($event).$mark);
+            $this->tree($events, $event['span_id'], $parent === null ? '' : $indent.($last ? '   ' : '│  '), $marked);
+        }
+    }
+
+    /**
+     * Prints every field of one event.
+     *
      * @param  array<string, mixed>  $event
      */
-    protected function summary(array $event): string
+    protected function fields(array $event): void
+    {
+        $this->components->twoColumnDetail('<info>'.$event['span_id'].'</info>');
+        collect(Arr::dot($event))->each(fn ($value, $key) => $this->components->twoColumnDetail($key, is_string($value) ? $value : json_encode($value)));
+    }
+
+    /**
+     * The method, route and status of a request, the job and its status, or the command and its exit code.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function what(array $event): string
     {
         $what = match ($event['entrypoint'] ?? null) {
             'http' => [$event['http.request.method'] ?? null, $event['http.route'] ?? $event['url.path'] ?? null, $event['http.response.status_code'] ?? null],
@@ -91,14 +148,30 @@ trait ReadsEvents
             default => [],
         };
 
-        $error = isset($event['error.type']) ? '<error>'.class_basename((string) $event['error.type']).': '.($event['exception.message'] ?? '').'</error>' : null;
+        return implode(' ', array_filter($what, fn ($part) => $part !== null && $part !== ''));
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    protected function errorMessage(array $event): ?string
+    {
+        return isset($event['error.type']) ? class_basename((string) $event['error.type']).': '.($event['exception.message'] ?? '') : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    protected function summary(array $event): string
+    {
+        $error = $this->errorMessage($event);
 
         return implode('  ', array_filter([
             '<comment>'.($event['entrypoint'] ?? '?').'</comment>',
             $event['span_id'],
-            implode(' ', array_filter($what, fn ($part) => $part !== null && $part !== '')),
+            $this->what($event),
             isset($event['duration_ms']) ? "{$event['duration_ms']}ms" : null,
-            $error,
+            $error === null ? null : "<error>{$error}</error>",
         ]));
     }
 }

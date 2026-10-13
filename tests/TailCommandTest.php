@@ -3,6 +3,8 @@
 namespace MarvelousDigital\WideEvents\Tests;
 
 use Illuminate\Support\Facades\Artisan;
+use Laravel\Prompts\Key;
+use Laravel\Prompts\Prompt;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Writer;
 
@@ -102,4 +104,31 @@ it('warns when nothing matches', function () {
 
     expect(Artisan::call('jot:tail', ['--where' => ['http.route=nope']]))->toBe(1)
         ->and(Artisan::output())->toContain('No matching event')->toContain('jot-tail.log');
+});
+
+it('browses the events in a table', function () {
+    tailed('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'timestamp' => now()->subMinute()->toIso8601String()]);
+    tailed('newer', ['span_id' => 'bbbbbbbbbbbbbbbb', 'user.id' => 7]);
+
+    Prompt::fake([Key::DOWN, Key::ENTER]);
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsChoice('Next', 'trace', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('Recent events')
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->doesntExpectOutputToContain('user.id')
+        ->expectsOutputToContain('1 event(s)')
+        ->assertSuccessful();
+});
+
+it('refuses --interactive with --follow or --json', function () {
+    $this->artisan('jot:tail', ['-i' => true, '--json' => true])->assertExitCode(2);
+    $this->artisan('jot:tail', ['-i' => true, '--follow' => true])->assertExitCode(2);
+});
+
+it('prints the plain list without an interactive input', function () {
+    tailed('home');
+
+    $this->artisan('jot:tail', ['-i' => true, '--no-interaction' => true])->expectsOutputToContain('GET home 200')->assertSuccessful();
 });
