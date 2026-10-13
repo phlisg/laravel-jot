@@ -3,9 +3,13 @@
 namespace MarvelousDigital\WideEvents\Tests;
 
 use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Console\Command;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Schedule;
@@ -14,12 +18,20 @@ use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
+use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Events\JobReleasedAfterException;
+use Illuminate\Queue\Jobs\SyncJob as QueuedJob;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use LogicException;
 use MarvelousDigital\WideEvents\Contracts\Retriable;
@@ -27,6 +39,8 @@ use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Writer;
 use RuntimeException;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 class RetriableException extends RuntimeException implements Retriable {}
 
@@ -66,14 +80,42 @@ class CreateUser extends Command
     }
 }
 
+class SendReports extends Command
+{
+    protected $signature = 'reports:send';
+
+    public function handle(): int
+    {
+        throw new RuntimeException('SMTP is down.');
+    }
+}
+
 function emitted(): array
 {
     return app(Writer::class)->faked;
 }
 
-function emittedBy(string $entrypoint): array
+function emittedBy(string $entrypoint): ?array
 {
     return collect(emitted())->firstWhere('entrypoint', $entrypoint);
+}
+
+/**
+ * A job as the worker hands it to the queue events.
+ */
+function workerJob(string $uuid = 'job-1'): QueuedJob
+{
+    return new QueuedJob(app(), json_encode([
+        'uuid' => $uuid, 'displayName' => SyncJob::class, 'job' => 'Illuminate\Queue\CallQueuedHandler@call', 'data' => [],
+    ]), 'redis', 'default');
+}
+
+function runCommand(string $command, int $exitCode = 0): void
+{
+    $input = new ArrayInput([]);
+
+    event(new CommandStarting($command, $input, new NullOutput));
+    event(new CommandFinished($command, $input, new NullOutput, $exitCode));
 }
 
 uses(WithConsoleEvents::class);
@@ -163,8 +205,62 @@ describe('http', function () {
 
         $this->get('/');
 
-        expect(emittedBy('http')['session.hash'])->toHaveLength(16)
-            ->not->toBe(session()->getId());
+        expect(emittedBy('http')['session.hash'])
+            ->toBe(substr(hash_hmac('sha256', session()->getId(), config('app.key')), 0, 16));
+    });
+
+    it('writes a login made during the request, with the user', function () {
+        Route::post('/login', function () {
+            auth()->setUser($user = new GenericUser(['id' => 9]));
+            event(new Login('web', $user, false));
+
+            return 'ok';
+        });
+
+        $this->post('/login');
+
+        expect(emittedBy('http'))->toMatchArray(['auth.result' => 'success', 'user.id' => 9]);
+    });
+
+    it('records no error for a 404', function () {
+        $this->get('/missing')->assertNotFound();
+
+        expect(emittedBy('http'))->toMatchArray(['http.response.status_code' => 404])->not->toHaveKey('error.type');
+    });
+
+    it('writes no error with the errors group switched off', function () {
+        config(['jot.fields.errors' => false]);
+        Route::get('/', fn () => report(new RuntimeException('CRM down')) ?? 'ok');
+
+        $this->get('/');
+
+        expect(emittedBy('http'))->not->toHaveKey('error.type');
+    });
+
+    it('skips the Jot::user() fields with the user group switched off', function () {
+        config(['jot.fields.user' => false]);
+        Jot::user(fn ($user) => ['user.plan' => 'enterprise']);
+        Route::get('/', fn () => 'ok');
+
+        $this->actingAs(new GenericUser(['id' => 7]))->get('/');
+
+        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.plan']);
+    });
+
+    it('counts database queries, cache misses and HTTP client calls', function () {
+        Http::fake(['*' => Http::response('ok')]);
+        Route::get('/', function () {
+            DB::select('select 1');
+            Cache::get('missing');
+            Http::get('https://example.test');
+            Http::get('https://example.test');
+
+            return 'ok';
+        });
+
+        $this->get('/');
+
+        expect(emittedBy('http'))->toMatchArray(['db.query_count' => 1, 'cache.misses' => 1, 'http_client.count' => 2]);
     });
 });
 
@@ -189,6 +285,7 @@ describe('queue', function () {
             'job.status' => 'processed',
             'import.rows' => 3,
         ])
+            ->not->toHaveKey('import.file')
             ->and($http)->toMatchArray(['import.file' => 'a.csv'])
             ->not->toHaveKey('import.rows');
     });
@@ -216,7 +313,68 @@ it('writes argument and option names, never their values', function () {
         'console.options' => ['--admin', '--password'],
         'console.exit_code' => 0,
     ])
-        ->and(json_encode($event))->not->toContain('secret');
+        ->and(json_encode($event))->not->toContain('secret')->not->toContain('jane@example.com');
+});
+
+it('writes the event of a command that never finished, when the app terminates', function () {
+    event(new CommandStarting('reports:send', new ArrayInput([]), new NullOutput));
+    jot()->error(new RuntimeException('SMTP is down.'));
+
+    app()->terminate();
+
+    expect(emittedBy('console'))->toMatchArray(['console.command' => 'reports:send', 'error.type' => RuntimeException::class])
+        ->and(jot()->traceId())->toBeNull();
+});
+
+it('adds the exception of a command that throws to its event', function () {
+    app(Kernel::class)->registerCommand(new SendReports);
+
+    try {
+        Artisan::call('reports:send');
+    } catch (RuntimeException $e) {
+        // As the console kernel does, once the command has ended.
+        report($e);
+    }
+
+    app()->terminate();
+
+    expect(emittedBy('console'))->toMatchArray(['console.exit_code' => 1, 'error.type' => RuntimeException::class]);
+})->skip('Bug: CommandFinished fires before Laravel reports the exception, so the event has no error.type.');
+
+it('writes nothing for long-running commands, dev tools and Composer hooks', function (string $command) {
+    runCommand($command, exitCode: 1);
+    runCommand('reports:send', exitCode: 1);
+
+    expect(array_column(emitted(), 'console.command'))->toBe(['reports:send']);
+})->with([
+    'queue:work', 'queue:listen', 'horizon', 'horizon:work', 'octane:start', 'reverb:start', 'schedule:run', 'schedule:work',
+    'pail', 'tinker', 'help', 'list', 'package:discover', 'vendor:publish', 'ide-helper:models', 'boost:mcp',
+    'filament:upgrade', 'test', 'jot:query', 'jot:env',
+]);
+
+it('writes nothing with Jot switched off', function () {
+    config(['jot.enabled' => false]);
+    app(Kernel::class)->registerCommand(new CreateUser);
+    Route::get('/', fn () => 'ok');
+    $task = app(Schedule::class)->call(fn () => null)->description('reports:send');
+
+    $response = $this->get('/');
+    SyncJob::dispatch();
+    Artisan::call('users:create', ['email' => 'jane@example.com']);
+    event(new ScheduledTaskStarting($task));
+    event(new ScheduledTaskFinished($task, 0.1));
+
+    expect(emitted())->toBe([])
+        ->and($response->headers->has('X-Request-Id'))->toBeFalse();
+});
+
+it('writes nothing for an event that never started', function () {
+    jot()->add('payment.provider', 'stripe');
+
+    expect(jot()->emit())->toBe([])
+        ->and(emitted())->toBe([])
+        ->and(jot()->initialize(Request::create('/'))->down())->toHaveKey('payment.provider', 'stripe')
+        ->and(emitted())->toHaveCount(1);
 });
 
 describe('sampling', function () {
@@ -351,16 +509,52 @@ it('writes a scheduled task', function () {
     ]);
 });
 
-it('keeps the error of a job the worker fails', function () {
-    $job = new \Illuminate\Queue\Jobs\SyncJob(app(), json_encode([
-        'uuid' => 'job-1', 'displayName' => SyncJob::class, 'job' => 'Illuminate\Queue\CallQueuedHandler@call', 'data' => [],
-    ]), 'redis', 'default');
+it('writes a failed scheduled task with its error and exit code, whatever the rate', function () {
+    config(['jot.sampling.rate' => 0.0]);
+    $task = app(Schedule::class)->call(fn () => null)->description('reports:send');
+
+    event(new ScheduledTaskStarting($task));
+    $task->exitCode = 1;
+    event(new ScheduledTaskFailed($task, new RuntimeException('SMTP is down.')));
+
+    expect(emittedBy('schedule'))->toMatchArray(['schedule.exit_code' => 1, 'error.type' => RuntimeException::class]);
+});
+
+it('keeps the error of a job the worker fails, and off the event that ran the worker', function () {
+    jot()->initialize(Request::create('/'));
+    $job = workerJob();
 
     // Worker order: JobFailed first, then JobExceptionOccurred.
     event(new JobProcessing('redis', $job));
-    event(new JobFailed('redis', $job, new RuntimeException('import broke')));
+    event(new JobFailed('redis', $job, $e = new RuntimeException('import broke')));
+    event(new JobExceptionOccurred('redis', $job, $e));
 
-    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class, 'error.count' => 1]);
+    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'failed', 'error.type' => RuntimeException::class, 'error.count' => 1])
+        ->and(jot()->event())->not->toHaveKey('error.type');
+});
+
+it('writes a job released for a retry, with its error', function () {
+    $job = workerJob();
+
+    event(new JobProcessing('redis', $job));
+    event(new JobExceptionOccurred('redis', $job, new RuntimeException('timeout')));
+    event(new JobReleasedAfterException('redis', $job, 10));
+
+    expect(emittedBy('queue'))->toMatchArray(['job.status' => 'released', 'error.type' => RuntimeException::class]);
+});
+
+it('ignores the events of a job it never started', function () {
+    $input = new ArrayInput([]);
+    event(new CommandStarting('reports:send', $input, new NullOutput));
+
+    event(new JobFailed('redis', $job = workerJob(), new RuntimeException('import broke')));
+    event(new JobProcessed('redis', $job));
+
+    expect(emitted())->toBe([]);
+
+    event(new CommandFinished('reports:send', $input, new NullOutput, 0));
+
+    expect(emittedBy('console'))->not->toHaveKey('error.type');
 });
 
 describe('ids across units of work', function () {
@@ -390,6 +584,17 @@ describe('ids across units of work', function () {
         expect($console)->toMatchArray(['trace_id' => $http['trace_id'], 'parent_span_id' => $http['span_id'], 'origin' => 'http'])
             ->and($console['span_id'])->not->toBe($http['span_id'])
             ->and(Context::get('span_id'))->toBe($http['span_id']);
+    });
+
+    it('restores the hidden Context after a sync job', function () {
+        Route::get('/', function () {
+            Context::addHidden('tenant', 'acme');
+            SyncJob::dispatch();
+
+            return Context::getHidden('tenant');
+        });
+
+        expect($this->get('/')->getContent())->toBe('acme');
     });
 
     it('keeps an upstream trace down to the jobs', function () {
