@@ -7,16 +7,16 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Prompts\DataTablePrompt;
 use Laravel\Prompts\Key;
+use MarvelousDigital\WideEvents\Commands\Concerns\BrowsesTraces;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use MarvelousDigital\WideEvents\Writer;
 use Psr\Log\LogLevel;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-use function Laravel\Prompts\select;
-
 #[AsCommand(name: 'jot:tail')]
 class TailCommand extends Command
 {
+    use BrowsesTraces;
     use ReadsEvents;
 
     protected $signature = 'jot:tail
@@ -175,19 +175,9 @@ class TailCommand extends Command
                 continue;
             }
 
-            $event = $events[$index];
             $span = null;
 
-            do {
-                $this->fields($event);
-                $next = select('Next', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit']);
-
-                if ($next === 'trace') {
-                    $event = $this->pick($files, $event);
-                }
-            } while ($next === 'trace');
-
-            if ($next === 'quit') {
+            if ($this->inspect($files, $events[$index], ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit']) === 'quit') {
                 return;
             }
         }
@@ -231,24 +221,6 @@ class TailCommand extends Command
         }
 
         return $table;
-    }
-
-    /**
-     * Lists the event's trace as the jot:query tree, the cursor on the event, and returns the event picked.
-     *
-     * @param  list<string>  $files
-     * @param  array<string, mixed>  $event
-     * @return array<string, mixed>
-     */
-    protected function pick(array $files, array $event): array
-    {
-        $trace = $this->find($files, (string) $event['trace_id'])->where('trace_id', $event['trace_id'])->sortBy('timestamp')->values();
-        // Prompts measures labels by length and styles them itself, so the console tags go.
-        $lines = array_map(fn ($line) => (string) preg_replace('#</?(comment|info|error)>#', '', $line), $this->tree($trace, $event['span_id']));
-
-        $span = select("Trace {$event['trace_id']}, {$trace->count()} event(s)", $lines, default: $event['span_id'], scroll: min(10, count($lines)));
-
-        return $trace->firstWhere('span_id', (string) $span) ?? $event;
     }
 
     /**

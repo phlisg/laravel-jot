@@ -3,12 +3,15 @@
 namespace MarvelousDigital\WideEvents\Commands;
 
 use Illuminate\Console\Command;
+use MarvelousDigital\WideEvents\Commands\Concerns\BrowsesTraces;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Output\StreamOutput;
 
 #[AsCommand(name: 'jot:query')]
 class QueryCommand extends Command
 {
+    use BrowsesTraces;
     use ReadsEvents;
 
     protected $signature = 'jot:query
@@ -37,6 +40,8 @@ class QueryCommand extends Command
             $this->components->warn("No event with ID {$id} in the last {$this->option('days')} days of: ".($files ? implode(', ', $files) : 'no readable log file'));
         } elseif ($this->option('json')) {
             $events->each(fn ($event) => $this->line(json_encode($event, JSON_UNESCAPED_SLASHES)));
+        } elseif (! $span && $events->count() > 1 && $this->interactive()) {
+            $this->inspect($files, $this->pick($files, $trace), ['trace' => 'Back to the trace', 'quit' => 'Quit']);
         } else {
             $this->line("Trace <info>{$trace}</info>, {$events->count()} event(s)");
             foreach ($this->tree($events, $span['span_id'] ?? null) as $line) {
@@ -58,5 +63,15 @@ class QueryCommand extends Command
         }
 
         return $events->isEmpty() ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Whether a person is at the terminal: an interactive input, and an output that is a TTY.
+     */
+    protected function interactive(): bool
+    {
+        $output = $this->output->getOutput();
+
+        return $this->input->isInteractive() && $output instanceof StreamOutput && stream_isatty($output->getStream());
     }
 }
