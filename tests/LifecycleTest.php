@@ -13,10 +13,12 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use LogicException;
 use MarvelousDigital\WideEvents\Contracts\Retriable;
@@ -300,13 +302,18 @@ it('writes the IDs once in the default file', function () {
     app(Writer::class)->faked = null;
     config(['jot.outputs' => [['channel' => null]]]);
     Route::get('/', fn () => 'ok');
+    $logged = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $log) use (&$logged) {
+        $logged[] = $log->context['trace_id'] ?? null;
+    });
 
     $this->get('/');
 
     $line = json_decode(file_get_contents($path), true);
 
     expect($line['context'])->toHaveKey('trace_id')
-        ->and($line)->not->toHaveKey('extra');
+        ->and($line)->not->toHaveKey('extra')
+        ->and($logged)->toBe([$line['context']['trace_id']]);
 });
 
 it('writes a scheduled task', function () {

@@ -3,12 +3,13 @@
 namespace MarvelousDigital\WideEvents;
 
 use Closure;
+use Illuminate\Log\Logger;
 use Illuminate\Support\Facades\Log;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
-use Monolog\Logger;
+use Monolog\Logger as Monolog;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
@@ -131,9 +132,10 @@ class Writer
             return Log::channel($channel);
         }
 
-        // A plain Monolog logger: Laravel's channels append Context to "extra", which repeats the event's IDs.
-        return $this->defaultChannel ??= new Logger('jot', [
+        // Built by hand: Laravel's channels append Context to "extra", which repeats the event's IDs.
+        // The Laravel wrapper still fires MessageLogged, which Pail listens to.
+        return $this->defaultChannel ??= new Logger(new Monolog('jot', [
             (new RotatingFileHandler(storage_path('logs/jot.log'), 7))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
-        ]);
+        ]), app('events'));
     }
 }
