@@ -1,6 +1,6 @@
 # Architecture
 
-How Jot collects fields during a unit of work and writes them as one event. For usage, see the README.
+How Jot collects fields during a unit of work and writes them as one event. For usage, see the [README](../README.md).
 
 ## Classes
 
@@ -71,16 +71,14 @@ request  span_id=a1  trace_id=t1
    └─ job B  span_id=c3  parent_span_id=b2  trace_id=t1
 ```
 
-The IDs follow W3C Trace Context, as in OpenTelemetry. `job.id` stays Laravel's job UUID (universally unique identifier), separate from `span_id`.
+`job.id` stays Laravel's job UUID (universally unique identifier), separate from `span_id`.
 
 Console:
 
 1. On `CommandStarting`, Jot starts an accumulator with `entrypoint=console`, a new `span_id` and `console.command`. `trace_id` and `parent_span_id` come from Context when set, so `Artisan::call()` in a request joins its trace.
 2. On `CommandFinished`, Jot adds `console.exit_code`, `console.arguments` and `console.options`, then emits.
 
-The names of arguments and options are read at the end, once the input is bound to the command definition. Only those that differ from their default are kept.
-
-Commands in `console.ignore` write no event. Their jobs and requests still do.
+The names of arguments and options are read at the end, once the input is bound to the command definition.
 
 Scheduler:
 
@@ -92,7 +90,7 @@ Livewire:
 1. Each component action is a `POST` to the `livewire.update` route, so it gets an HTTP event like any request.
 2. `LivewireListener` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` on that route only. The same hooks fire on the first page load, which stays a plain HTTP event.
 3. A listener must return nothing. Livewire calls back any returned closure when the request ends.
-4. Livewire answers a failed validation with a 200 and never reports it. The `exception` hook still sees it, which gives `livewire.validation_*`.
+4. The `exception` hook sees the validation exception that Livewire never reports, which gives `livewire.validation_*`.
 
 The hooks are public (`Livewire::listen()`) but undocumented. Livewire 3 and 4 call them with the same first arguments, and Livewire 4 adds `$metadata` to `call`, which marks a `wire:poll`.
 
@@ -105,7 +103,9 @@ A sync job, `dispatchAfterResponse()` or `Artisan::call()` runs inside the curre
 
 Without the stack, a sync job would erase the fields of the request that runs it.
 
-Each stack entry is keyed by the job, command input or scheduled task object. An end event for any other object is ignored, which covers a job that fires `JobFailed` then `JobProcessed`. When the app terminates, the entries left over emit. A command that throws on Laravel 11 never fires `CommandFinished`.
+Each stack entry is keyed by the job, command input or scheduled task object. An end event for any other object is ignored, which covers a job that fires `JobFailed` then `JobProcessed`.
+
+When the app terminates, leftover entries emit. This covers a command that throws on Laravel 11, which never fires `CommandFinished`.
 
 ## Building the event
 
@@ -124,9 +124,12 @@ Each collision logs a warning on the default log channel, see [Key collisions](.
 
 `Writer` decides at emit time whether to keep the event (tail sampling), then writes it once per entry in `outputs`. Each output shape is built from the flat event when it is written.
 
-Each event gets a log level from its fields (`Writer::level()`), and an output with a `level` key skips events below it. When the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already. `Jot::tagSentry()` tags the Sentry scope with `trace_id` and `span_id`, and adds a "Jot" context with the `jot:query` command and the optional `jot.sentry.link`. It runs at each start, and again when the stack restores the previous event, so an issue never carries the IDs of a sync job that already ended.
+- Levels: `Writer::level()` gives each event a log level from its fields. An output with a `level` key skips events below it.
+- Sentry channel: when the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already.
+- Sentry tags: `Jot::tagSentry()` tags the Sentry scope with `trace_id` and `span_id`, and adds a "Jot" context with the `jot:query` command and the optional `jot.sentry.link`.
+- Re-tagging: `tagSentry()` runs at each start, and again when the stack restores the previous event, so an issue never carries the IDs of a sync job that already ended.
 
-An output with channel `null` writes to a daily file, `storage/logs/jot.log`, kept 7 days, with Monolog's `JsonFormatter`. Laravel's channels append Context to each line, which would repeat the IDs, so Jot builds this Monolog logger by hand and wraps it in Laravel's `Illuminate\Log\Logger`. The wrapper still fires `MessageLogged`, so `php artisan pail` shows the events. Errors while writing are reported and swallowed: logging never breaks the app.
+An output with channel `null` writes to a daily file, `storage/logs/jot-YYYY-MM-DD.log`, kept `jot.days` days, with Monolog's `JsonFormatter`. Laravel's channels append Context to each line, which would repeat the IDs, so Jot builds this Monolog logger by hand and wraps it in Laravel's `Illuminate\Log\Logger`. The wrapper still fires `MessageLogged`, so `php artisan pail` shows the events. Errors while writing are reported and swallowed: logging never breaks the app.
 
 ## Open questions
 

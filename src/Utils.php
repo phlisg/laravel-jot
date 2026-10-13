@@ -12,7 +12,7 @@ use ReflectionProperty;
 trait Utils
 {
     /**
-     * Flattening rules live in the README, see "Sections".
+     * Flattening rules: see "Flattening rules" in docs/fields.md.
      */
     protected static function walkArrayToDot(array $values, ?string $prefix = null): array
     {

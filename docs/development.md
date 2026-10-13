@@ -52,7 +52,7 @@ The workbench is a small Laravel app, built with Orchestra Testbench Workbench, 
 - `testbench.yaml`: providers, route and command discovery, database build steps.
 - `workbench/routes/web.php`: one route per scenario step.
 - `workbench/app/Console/Commands/DemoCommand.php`: `jot:demo`, which runs the scenarios.
-- `workbench/app/Jot`: sections, as the README recommends for an app.
+- `workbench/app/Jot`: sections, as [Where sections live](fields.md#where-sections-live) recommends for an app.
 
 ### Setup
 
@@ -76,7 +76,7 @@ It creates an SQLite database, runs the Laravel default migrations (users, cache
 
 | Scenario | What it shows |
 |---|---|
-| `booking` | The four requests of [Example: paid event booking](../README.md#example-paid-event-booking), with a `PaymentLog` section and enums |
+| `booking` | The four requests of [Paid event booking](examples.md#paid-event-booking), with a `PaymentLog` section and enums |
 | `job-failed` | A request queues a job, `queue:work --stop-when-empty` runs it, the job fails |
 | `job-sync` | A sync job inside a request: `parent_span_id` and `trace_id` point to the request |
 | `login` | `auth.result=success` and `user.id` |
@@ -110,7 +110,7 @@ tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).
 
 ### Terminal recordings
 
-`composer docs:tapes` renders the README GIFs in `docs/images` from the [VHS](https://github.com/charmbracelet/vhs) tapes in `docs/tapes`. Run it on the host, not through `./dev`: it needs `vhs` and PHP with `pdo_sqlite`, and it replaces the events in the workbench log.
+`composer docs:tapes` renders the GIFs in `docs/images`, used by the README and [Querying events](querying.md), from the [VHS](https://github.com/charmbracelet/vhs) tapes in `docs/tapes`. Run it on the host: it needs `vhs` and PHP with `pdo_sqlite`, and it replaces the events in the workbench log.
 
 ### New scenario
 
@@ -154,5 +154,5 @@ Other types, such as `build:`, `test:` or `style:`, stay out of the notes. A com
 
 Set up the token and the repository as in [Installation](../README.md#installation). Then:
 
-- A release: `composer require marvelous-digital/laravel-wide-events:^0.2`
+- A release: `composer require marvelous-digital/laravel-wide-events:^0.3`
 - Unreleased work on `develop`: `composer require marvelous-digital/laravel-wide-events:dev-develop`
