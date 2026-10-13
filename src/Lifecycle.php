@@ -92,7 +92,7 @@ class Lifecycle
         if ($on('db')) {
             $events->listen(QueryExecuted::class, fn (QueryExecuted $e) => $this->section(PerformanceSection::class, function (PerformanceSection $p) use ($e) {
                 $p->dbQueryCount++;
-                $p->dbTimeMs += $e->time;
+                $p->dbTimeMs = round($p->dbTimeMs + $e->time, 2);
             }));
         }
 
