@@ -77,7 +77,7 @@ class Lifecycle
         $this->registerPerformance($events);
         (new LivewireListener)->register();
 
-        // A command that throws never fires CommandFinished.
+        // Leftovers: a failed outer command, or a command that throws on Laravel 11, which never fires CommandFinished.
         app()->terminating(function () {
             while ($unit = $this->top()) {
                 $this->pop($unit, fn () => null);

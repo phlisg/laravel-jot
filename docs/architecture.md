@@ -78,7 +78,7 @@ request  span_id=a1  trace_id=t1
 Console:
 
 1. On `CommandStarting`, Jot starts an accumulator with `entrypoint=console`, a new `span_id` and `console.command`. `trace_id` and `parent_span_id` come from Context when set, so `Artisan::call()` in a request joins its trace.
-2. On `CommandFinished`, Jot adds `console.exit_code`, `console.arguments` and `console.options`, then emits.
+2. On `CommandFinished`, Jot adds `console.exit_code`, `console.arguments` and `console.options`, then emits. A failed outer command waits for the app to terminate instead: Laravel reports its exception after `CommandFinished`, so the error lands on the event first.
 
 The names of arguments and options are read at the end, once the input is bound to the command definition.
 
@@ -107,7 +107,7 @@ Without the stack, a sync job would erase the fields of the request that runs it
 
 Each stack entry is keyed by the job, command input or scheduled task object. An end event for any other object is ignored, which covers a job that fires `JobFailed` then `JobProcessed`.
 
-When the app terminates, leftover entries emit. This covers a command that throws on Laravel 11, which never fires `CommandFinished`.
+When the app terminates, leftover entries emit. This covers a failed outer command, and a command that throws on Laravel 11, which never fires `CommandFinished`.
 
 ## Building the event
 
