@@ -209,10 +209,9 @@ Places to print it:
 
 - The app's own error pages: `500.blade.php`, and the 403, 419 or 429 pages it customizes. Jot's default page covers 500 only.
   ```blade
-  @if (jot()->traceId())
-      <p>Reference: @traceId</p>
-  @endif
+  <p>Reference: @traceId</p>
   ```
+  With `JOT_ENABLED=false`, `@traceId` prints nothing and the label stands alone.
 - A support or contact form: a hidden field, so the ticket carries the trace of the page that rendered the form. Submitting the form is a new request with its own trace. The trace also holds the jobs that page dispatched, so a failed export or payment shows up.
   ```blade
   <input type="hidden" name="trace_id" value="@traceId">
