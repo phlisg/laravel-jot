@@ -19,7 +19,7 @@ use Psr\Log\LogLevel;
 class Writer
 {
     /** @var list<Closure(array<string, mixed>): bool> */
-    public array $rules = [];
+    public array $keeps = [];
 
     /** @var list<Closure(array<string, mixed>): bool> */
     public array $drops = [];
@@ -122,7 +122,7 @@ class Writer
             }
         }
 
-        foreach ($this->rules as $rule) {
+        foreach ($this->keeps as $rule) {
             if ($rule($event)) {
                 return true;
             }

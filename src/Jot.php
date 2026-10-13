@@ -179,7 +179,7 @@ class Jot
      */
     public function keepWhen(Closure $rule): void
     {
-        app(Writer::class)->rules[] = $rule;
+        app(Writer::class)->keeps[] = $rule;
     }
 
     /**
