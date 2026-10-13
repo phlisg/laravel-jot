@@ -4,7 +4,9 @@ namespace MarvelousDigital\WideEvents;
 
 use Closure;
 use Illuminate\Log\Logger;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\RotatingFileHandler;
@@ -67,12 +69,16 @@ class Writer
     {
         $status = $event['http.response.status_code'] ?? 0;
 
-        return match (true) {
+        $derived = match (true) {
             isset($event['error.type']), $status >= 500, ($event['job.status'] ?? null) === 'failed' => LogLevel::ERROR,
             $status >= 400, ! in_array($event['console.exit_code'] ?? $event['schedule.exit_code'] ?? 0, [0, null], true) => LogLevel::WARNING,
             static::slow($event) => LogLevel::NOTICE,
             default => LogLevel::INFO,
         };
+
+        $raised = $event['level.raised'] ?? null;
+
+        return $raised && Level::fromName($raised)->isHigherThan(Level::fromName($derived)) ? $raised : $derived;
     }
 
     public static function slow(array $event): bool
@@ -112,14 +118,15 @@ class Writer
      */
     public function keep(array $event): bool
     {
-        if (static::level($event) === LogLevel::ERROR || static::slow($event)) {
-            return true;
+        $level = static::level($event);
+        $status = $event['http.response.status_code'] ?? 0;
+
+        if ($level === LogLevel::ERROR || static::slow($event) || isset($event['level.raised']) || ($level === LogLevel::WARNING && $status < 400)) {
+            return $this->underLimit($event, $level);
         }
 
-        foreach ($this->drops as $rule) {
-            if ($rule($event)) {
-                return false;
-            }
+        if ($this->dropped($event)) {
+            return false;
         }
 
         foreach ($this->keeps as $rule) {
@@ -128,9 +135,82 @@ class Writer
             }
         }
 
-        $rate = (float) config('jot.sampling.rate', 1.0);
+        $rate = (float) config($status >= 400 ? 'jot.sampling.client_errors' : 'jot.sampling.rate', 1.0);
 
         return $rate >= 1 || mt_rand() / mt_getrandmax() < $rate;
+    }
+
+    /**
+     * Every key matches its pattern: * wildcards, commas for OR. The syntax of jot:query --where.
+     *
+     * @param  array<string, mixed>  $where
+     */
+    public static function matches(array $event, array $where): bool
+    {
+        $text = fn (mixed $value) => is_string($value) ? $value : (string) json_encode($value);
+
+        foreach ($where as $key => $pattern) {
+            $value = $event[$key] ?? null;
+
+            if ($value === null || ! Str::is(explode(',', $text($pattern)), $text($value))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function dropped(array $event): bool
+    {
+        if (config('jot.sampling.drop_livewire_polls', true) && static::livewirePoll($event)) {
+            return true;
+        }
+
+        foreach (config('jot.sampling.drop', []) as $where) {
+            if ($where && static::matches($event, $where)) {
+                return true;
+            }
+        }
+
+        foreach ($this->drops as $rule) {
+            if ($rule($event)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * An update with no call, wire:model change or event. Needs the Livewire fields to tell.
+     */
+    protected static function livewirePoll(array $event): bool
+    {
+        return isset($event['livewire.components'])
+            && (($event['livewire.poll'] ?? false)
+                || ! isset($event['livewire.calls']) && ! isset($event['livewire.updates']) && ! isset($event['livewire.events']));
+    }
+
+    /**
+     * Caps an error storm: a database outage turns every request into an error.
+     */
+    protected function underLimit(array $event, string $level): bool
+    {
+        $limit = config('jot.sampling.max_per_minute', 10);
+
+        if (! $limit) {
+            return true;
+        }
+
+        $kind = implode('|', [$level, $event['error.type'] ?? '', $event['http.route'] ?? $event['job.name'] ?? $event['console.command'] ?? $event['schedule.task'] ?? '']);
+        $key = 'jot:limit:'.md5($kind).':'.now()->format('YmdHi');
+
+        // A cache store that fails keeps the event. ponytail: file and database stores count without a lock, so the cap is approximate under load.
+        return rescue(function () use ($key, $limit) {
+            Cache::add($key, 0, 120);
+
+            return Cache::increment($key) <= (int) $limit;
+        }, true, false);
     }
 
     protected function channel(?string $channel): LoggerInterface
@@ -142,7 +222,7 @@ class Writer
         // Built by hand: Laravel's channels append Context to "extra", which repeats the event's IDs.
         // The Laravel wrapper still fires MessageLogged, which Pail listens to.
         return $this->defaultChannel ??= new Logger(new Monolog('jot', [
-            (new RotatingFileHandler(static::defaultPath(), 7))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
+            (new RotatingFileHandler(static::defaultPath(), (int) config('jot.days', 7)))->setFormatter(new JsonFormatter(ignoreEmptyContextAndExtra: true)),
         ]), app('events'));
     }
 }

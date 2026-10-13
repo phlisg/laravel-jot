@@ -17,6 +17,7 @@ use MarvelousDigital\WideEvents\Sections\PerformanceSection;
 use MarvelousDigital\WideEvents\Sections\QuerySection;
 use MarvelousDigital\WideEvents\Sections\RequestSection;
 use MarvelousDigital\WideEvents\Sections\UserSection;
+use Monolog\Level;
 use PHPUnit\Framework\Assert;
 use ReflectionClass;
 use ReflectionException;
@@ -173,23 +174,52 @@ class Jot
     }
 
     /**
-     * A sampling rule: an event it returns true for is always written.
+     * A sampling rule: an event it matches is written, unless a drop rule matches it too.
      *
-     * @param  Closure(array<string, mixed>): bool  $rule
+     * @param  (Closure(array<string, mixed>): bool)|array<string, mixed>  $rule  a closure, or patterns as in jot:query --where
      */
-    public function keepWhen(Closure $rule): void
+    public function keepWhen(Closure|array $rule): void
     {
-        app(Writer::class)->keeps[] = $rule;
+        app(Writer::class)->keeps[] = $this->rule($rule);
     }
 
     /**
-     * A sampling rule: an event it returns true for is never written, unless it failed or was slow.
+     * A sampling rule: an event it matches is never written, unless it failed, was slow or had its level raised.
      *
-     * @param  Closure(array<string, mixed>): bool  $rule
+     * @param  (Closure(array<string, mixed>): bool)|array<string, mixed>  $rule  a closure, or patterns as in jot:query --where
      */
-    public function dropWhen(Closure $rule): void
+    public function dropWhen(Closure|array $rule): void
     {
-        app(Writer::class)->drops[] = $rule;
+        app(Writer::class)->drops[] = $this->rule($rule);
+    }
+
+    protected function rule(Closure|array $rule): Closure
+    {
+        return is_array($rule) ? fn (array $event) => $rule && Writer::matches($event, $rule) : $rule;
+    }
+
+    /**
+     * Marks the event as worth reading: sampling always keeps it. Raises the level, never lowers it.
+     *
+     * @param  string  $level  a Psr\Log\LogLevel constant
+     */
+    public function level(string $level, ?string $reason = null): static
+    {
+        // Logging must never break the app: an unknown level name is ignored.
+        $level = rescue(fn () => Level::fromName($level), null, false);
+
+        if (! $level || ! $level->isHigherThan(Level::fromName($this->fields['level.raised'] ?? 'debug'))) {
+            return $this;
+        }
+
+        $this->appendKey('level.raised', $level->toPsrLogLevel(), 'Jot::level()');
+        unset($this->fields['level.reason']);
+
+        if ($reason !== null) {
+            $this->appendKey('level.reason', $reason, 'Jot::level()');
+        }
+
+        return $this;
     }
 
     public function fake(): void

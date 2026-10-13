@@ -25,7 +25,7 @@ class QueryCommand extends Command
         {--errors : Only events with an error.type, a 5xx status or a failed job}
         {--slow : Only events slower than jot.sampling.slow_ms}
         {--since= : Only events newer than this, for example 15m, 2h or 1d}
-        {--days= : How many days of log files to read: 7 with an ID, 1 without}
+        {--days= : How many days of log files to read: jot.days with an ID, 1 without}
         {--follow : Keep printing new events as they are written}
         {--json : Print the events as JSON lines}';
 
@@ -74,7 +74,7 @@ class QueryCommand extends Command
                 return self::INVALID;
             }
 
-            return [(int) ($this->option('days') ?? 7), fn () => true];
+            return [(int) ($this->option('days') ?? config('jot.days', 7)), fn () => true];
         }
 
         $where = [];
@@ -355,15 +355,7 @@ class QueryCommand extends Command
             return false;
         }
 
-        foreach ($where as $key => $pattern) {
-            $value = $event[$key] ?? null;
-
-            if ($value === null || ! Str::is(explode(',', $pattern), is_string($value) ? $value : (string) json_encode($value))) {
-                return false;
-            }
-        }
-
-        return true;
+        return Writer::matches($event, $where);
     }
 
     /**
