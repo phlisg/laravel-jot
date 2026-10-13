@@ -143,14 +143,12 @@ trait ReadsEvents
     }
 
     /**
-     * Prints every field of one event.
-     *
      * @param  array<string, mixed>  $event
      */
-    protected function fields(array $event): void
+    protected function printFields(array $event): void
     {
         $this->components->twoColumnDetail('<info>'.$event['span_id'].'</info>');
-        collect(Arr::dot($event))->each(fn ($value, $key) => $this->components->twoColumnDetail($key, is_string($value) ? $value : json_encode($value)));
+        collect($event)->each(fn ($value, $key) => $this->components->twoColumnDetail($key, is_string($value) ? $value : json_encode($value)));
     }
 
     /**
@@ -215,9 +213,6 @@ trait ReadsEvents
         }
     }
 
-    /**
-     * Whether a person is at the terminal: an interactive input, and an output that is a TTY.
-     */
     protected function atTerminal(): bool
     {
         $output = $this->output->getOutput();
@@ -239,11 +234,11 @@ trait ReadsEvents
 
         $picked = select("Trace {$traceId}, {$trace->count()} event(s)", $lines, default: $span, scroll: min(10, count($lines)));
 
-        return $trace->firstWhere('span_id', (string) $picked) ?? $trace->first();
+        return $trace->firstWhere('span_id', (string) $picked);
     }
 
     /**
-     * Prints every field of the event, then asks what next, picking again from the trace until another choice.
+     * Shows the event's fields until the user picks a non-trace choice.
      *
      * @param  list<string>  $files
      * @param  array<string, mixed>  $event
@@ -252,7 +247,7 @@ trait ReadsEvents
     protected function inspect(array $files, array $event, array $choices): string
     {
         do {
-            $this->fields($event);
+            $this->printFields($event);
             $next = (string) select('Next', $choices);
 
             if ($next === 'trace') {

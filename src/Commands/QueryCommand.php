@@ -48,7 +48,7 @@ class QueryCommand extends Command
 
             if ($span) {
                 $this->newLine();
-                $this->fields($span);
+                $this->printFields($span);
             } else {
                 $this->line('<comment>Run jot:query with a span ID for every field of that event.</comment>');
             }
