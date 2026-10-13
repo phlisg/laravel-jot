@@ -134,6 +134,7 @@ php artisan jot:query --limit=50 --since=15m
 php artisan jot:query --errors                          # error.type set, 5xx status or failed job
 php artisan jot:query --slow                            # slower than jot.sampling.slow_ms
 php artisan jot:query --where=http.route=events.* --where=user.id=42
+php artisan jot:query --where=entrypoint=queue,schedule  # jobs and scheduled tasks
 php artisan jot:query --follow                          # keep printing new events, Ctrl+C to stop
 php artisan jot:query --json                            # one JSON line per event
 ```
@@ -146,7 +147,7 @@ php artisan jot:query --json                            # one JSON line per even
 Run jot:query <trace_id> for a trace, or <span_id> for every field.
 ```
 
-- `--where`: `key=value` on the flat field names, with `*` wildcards. Repeat it to combine filters.
+- `--where`: `key=value` on the flat field names, with `*` wildcards. Commas list alternatives: `--where=entrypoint=http,queue`. Repeat `--where` to require several fields.
 - `--since`: a number and a unit (`s`, `m`, `h` or `d`), such as `15m`.
 - `--days=1`: how many days of files to read. `--since` reads further back when it needs to.
 - `--follow`: prints new events as they are written, as plain lines, even at a terminal.

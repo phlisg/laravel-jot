@@ -355,7 +355,7 @@ class QueryCommand extends Command
         foreach ($where as $key => $pattern) {
             $value = $event[$key] ?? null;
 
-            if ($value === null || ! Str::is($pattern, is_string($value) ? $value : (string) json_encode($value))) {
+            if ($value === null || ! Str::is(explode(',', $pattern), is_string($value) ? $value : (string) json_encode($value))) {
                 return false;
             }
         }
