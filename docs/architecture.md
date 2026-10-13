@@ -71,7 +71,7 @@ request  span_id=a1  trace_id=t1
    └─ job B  span_id=c3  parent_span_id=b2  trace_id=t1
 ```
 
-The IDs follow W3C Trace Context, as in OpenTelemetry. `job.id` stays Laravel's job UUID, apart from `span_id`.
+The IDs follow W3C Trace Context, as in OpenTelemetry. `job.id` stays Laravel's job UUID (universally unique identifier), separate from `span_id`.
 
 Console:
 
@@ -90,7 +90,7 @@ Scheduler:
 Livewire:
 
 1. Each component action is a `POST` to the `livewire.update` route, so it gets an HTTP event like any request.
-2. `LivewireListener` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` only on that route. The same hooks fire on the first page load, which stays a plain HTTP event.
+2. `LivewireListener` listens to Livewire's `hydrate`, `update`, `call` and `exception` hooks, and fills `Sections\LivewireSection` on that route only. The same hooks fire on the first page load, which stays a plain HTTP event.
 3. A listener must return nothing. Livewire calls back any returned closure when the request ends.
 4. Livewire answers a failed validation with a 200 and never reports it. The `exception` hook still sees it, which gives `livewire.validation_*`.
 
@@ -126,7 +126,7 @@ Each collision logs a warning on the default log channel, see [Key collisions](.
 
 Each event gets a log level from its fields (`Writer::level()`), and an output with a `level` key skips events below it. When the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already. `Jot::tagSentry()` tags the Sentry scope with `trace_id` and `span_id`, and adds a "Jot" context with the `jot:query` command and the optional `jot.sentry.link`. It runs at each start, and again when the stack restores the previous event, so an issue never carries the IDs of a sync job that already ended.
 
-An output with channel `null` writes to a daily file, `storage/logs/jot.log`, kept 7 days, with Monolog's `JsonFormatter`. It wraps a Monolog logger built by hand in Laravel's `Illuminate\Log\Logger`: Laravel's channels append Context to each line, which would repeat the IDs, and the wrapper still fires `MessageLogged`, so `php artisan pail` shows the events. Errors while writing are reported and swallowed: logging never breaks the app.
+An output with channel `null` writes to a daily file, `storage/logs/jot.log`, kept 7 days, with Monolog's `JsonFormatter`. Laravel's channels append Context to each line, which would repeat the IDs, so Jot builds this Monolog logger by hand and wraps it in Laravel's `Illuminate\Log\Logger`. The wrapper still fires `MessageLogged`, so `php artisan pail` shows the events. Errors while writing are reported and swallowed: logging never breaks the app.
 
 ## Open questions
 

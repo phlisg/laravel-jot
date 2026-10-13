@@ -45,15 +45,15 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 
 - Zero setup: install the package and every request, job, command and scheduled task writes a wide event.
 - `jot()` global helper, with a `Jot` facade as a fallback.
-- Trace ID on every event, shared by a request and the jobs and commands it starts, in W3C Trace Context format.
+- Trace ID on every event, shared by a request and the jobs and commands it starts, in the [W3C Trace Context](https://www.w3.org/TR/trace-context/) format.
 - Automatic fields: user, hashed session, login outcome, HTTP details, errors, duration, database usage.
 - Typed section classes that define the log schema.
 - Backed enums for fields with a fixed set of values.
 - Tail sampling: keep every error and slow request, sample the rest.
 - Strict mode that warns on fields outside the schema.
 - Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
-- `jot:query`: reads the events back from the log files, by trace, by filter or in an interactive table.
-- Livewire and Filament: the components, calls and failed validations of each Livewire update.
+- `jot:query`: reads events back from the log files, by trace, by filter or in an interactive table.
+- Livewire and Filament: each Livewire update records its components, calls and failed validations.
 
 ## Installation
 
@@ -112,15 +112,15 @@ Without an import, the root alias works too: `\Jot::add(...)`. The pair mirrors 
 
 ### Reading events
 
-`jot:query` reads the events back from the log files, so nobody has to find and search the files by hand:
+`php artisan jot:query` reads events back from the log files, so nobody has to find and search them by hand:
 
 - `jot:query`: the most recent events, with filters.
 - `jot:query <trace_id>`: one trace.
 - `jot:query <span_id>`: one event, with every field.
 
-At a terminal it opens a list to browse. Piped, in CI (continuous integration), with `-n` or with `--json`, it prints plain lines.
+At a terminal, it opens an interactive list. Piped, in CI (continuous integration), with `-n` (`--no-interaction`) or with `--json`, it prints plain lines.
 
-It reads only outputs on a `single` or `daily` channel, the ones that write files, plus the default Jot file. For any other output, such as `stderr` or Sentry Logs, it prints where else to look.
+It reads the outputs that write files: the default Jot file and any `single` or `daily` channel. For other outputs, such as `stderr` or Sentry Logs, it prints where else to look.
 
 For a live stream of all log messages, Jot events included, run `php artisan pail`.
 
@@ -147,15 +147,15 @@ Run jot:query <trace_id> for a trace, or <span_id> for every field.
 ```
 
 - `--where`: `key=value` on the flat field names, with `*` wildcards. Repeat it to combine filters.
-- `--since`: a number and a unit: `s`, `m`, `h` or `d`.
+- `--since`: a number and a unit (`s`, `m`, `h` or `d`), such as `15m`.
 - `--days=1`: how many days of files to read. `--since` reads further back when it needs to.
-- `--follow`: prints new events as they are written, as plain lines, also at a terminal.
+- `--follow`: prints new events as they are written, as plain lines, even at a terminal.
 
-These filters apply to the recent events only. With an ID, `jot:query` refuses them.
+These options work without an ID only. With an ID, `jot:query` refuses all of them except `--days` and `--json`.
 
 #### Browsing
 
-At a terminal, the recent events open in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the event:
+At a terminal, the recent events open in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the selected event:
 
 ```sh
 php artisan jot:query --since=1h
@@ -173,12 +173,12 @@ php artisan jot:query --since=1h
 ```
 
 - The newest event is at the top.
-- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the trace's events as a tree (see "One trace" below), and Enter on any of them prints its fields.
+- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the events of the trace as a tree, see [One trace](#one-trace). Enter on any of them prints its fields.
 - The table takes the same filters as the plain list.
 
 #### One trace
 
-With a trace ID, `jot:query` finds the events of the trace and prints them as a tree, with `parent_span_id` showing which event started which:
+With a trace ID, `jot:query` prints the events of the trace as a tree. `parent_span_id` places each event under the one that started it:
 
 ```sh
 php artisan jot:query 4bf92f3577b34da6a3ce929d0e0e4736
@@ -195,7 +195,7 @@ http  f56220033574661e  POST checkout.store 200  412ms
 - `--days=7`: how many days of files to read.
 - `--json`: one JSON line per event.
 
-At a terminal, a trace ID opens the trace as a list laid out as the tree. Enter on an event prints every field, then pick Back to the trace or Quit. A span ID, or a trace with a single event, prints the tree as above.
+At a terminal, a trace with several events opens as a list laid out as the tree. Enter on an event prints every field, then offers Back to the trace or Quit. A span ID, or a trace with a single event, prints the tree as above.
 
 ## Configuration
 
@@ -297,7 +297,7 @@ return [
 Settings that need a decision per app:
 
 - `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Sentry and GlitchTip](#sentry-and-glitchtip) for the levels.
-- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
+- `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the `traceparent` and `X-Request-Id` headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
 - `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
 - `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
 - `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
@@ -442,11 +442,11 @@ On a collision, the package keeps the last write and logs a warning on the app's
 [jot] Key "payment.provider" was already added by App\Jot\StripePayment, then overwritten by a string key.
 ```
 
-The fields the package adds itself, listed in [Automatic fields](#automatic-fields), always win over app fields with the same key. `jot()->add('user.id', 5)` is overwritten by the logged-in user's ID, with a warning.
+The fields the package adds itself, listed in [Automatic fields](#automatic-fields), always win over app fields with the same key. With a user logged in, `jot()->add('user.id', 5)` gives way to that user's ID, with a warning.
 
 ## Loose fields
 
-A loose field is a field added with a string or enum key, outside any section. The app has three ways to add a field, from the quickest to the safest:
+A loose field has a string or enum key and belongs to no section. The app adds a field in one of three ways, from the quickest to the safest:
 
 ```php
 jot()->add('feature.new_checkout', true);       // string key
@@ -478,7 +478,7 @@ Strict mode finds them. With `JOT_STRICT=true`, the package still writes every s
 [jot] String key "feature.new_checkout" written; declare it in an enum or a section.
 ```
 
-Enum keys and sections never trigger the warning. Turn strict mode on in local and CI environments to catch string keys before they reach production, and keep it off in production, where the warnings would only add noise.
+Enum keys and sections never trigger the warning. Turn strict mode on in local and CI environments to catch string keys before they reach production. Keep it off in production, where the warnings only add noise.
 
 ## Field conventions
 
@@ -500,7 +500,7 @@ Field names follow the OpenTelemetry semantic conventions where one exists. Fiel
 
 Always on:
 
-- `trace_id`: shared by every event in the chain, so one query finds a request and every job and command it started. New for each request, unless a trusted `traceparent` header brings one. The `X-Request-Id` response header returns it.
+- `trace_id`: shared by a request and every job and command it starts, so one query finds them all. New at the start of each trace, unless a trusted `traceparent` header brings one. The `X-Request-Id` response header returns it.
 - `span_id`: this event's own ID.
 - `parent_span_id`: the `span_id` of the request, job or command that started this one. Absent on the first event of a trace.
 - `timestamp`: start time, in ISO 8601 format.
@@ -508,7 +508,7 @@ Always on:
 - `origin`: the `entrypoint` of the first event in the trace. A job dispatched by a scheduled task has `entrypoint=queue` and `origin=schedule`.
 - `duration_ms`: time from start to emit.
 
-The IDs follow W3C Trace Context: 32 hex characters for `trace_id`, 16 for the span IDs.
+The IDs follow W3C Trace Context: 32 hexadecimal characters for `trace_id`, 16 for the span IDs.
 
 By group:
 
@@ -605,19 +605,19 @@ A registration form, submitted with an invalid email:
 - `livewire.validation_failed`, `livewire.validation_fields`: a failed validation and the fields that failed. Livewire answers it with a 200 and never reports it, so these fields are its only trace.
 - `filament.action`: the Filament action the user opened or ran, such as `delete`.
 
-Each list holds up to 10 entries. The first page load writes a plain HTTP event. File uploads have their own routes, visible in `http.route`. The switch is `fields.livewire` in `config/jot.php`.
+Each list holds up to 10 distinct entries. The first page load writes a plain HTTP event. File uploads have their own routes, visible in `http.route`. The switch is `fields.livewire` in `config/jot.php`.
 
 > Security: the package logs method names, property paths and event names, never values or parameters. What a user types in a form, such as an email or a password, stays out of the event.
 
 ### Polling
 
-A component with `wire:poll` sends a request every few seconds while the page stays open, and each request writes an event. A `dropWhen` rule removes them, see [Sampling](#sampling):
+A component with `wire:poll` sends a request every few seconds while the page stays open, and each request writes an event. A `dropWhen` rule keeps them out of the logs, see [Sampling](#sampling). On Livewire 3 or 4, match the polled method:
 
 ```php
 Jot::dropWhen(fn (array $event) => ($event['livewire.calls'] ?? null) === ['registration-form::checkStatus']);
 ```
 
-On Livewire 4, `livewire.poll` marks every poll:
+On Livewire 4 only, `livewire.poll` marks every poll:
 
 ```php
 Jot::dropWhen(fn (array $event) => $event['livewire.poll'] ?? false);
@@ -702,7 +702,7 @@ With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works w
 - Every Sentry issue gets the tags `trace_id` and `span_id`, which point to its wide event in the logs.
 - With Sentry Logs on, each event also goes to Sentry Logs, with every field as a searchable attribute.
 
-GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs. Marvelous Digital's instance: https://glitchtip.marvelous.digital/.
+GlitchTip, an open source alternative to Sentry, accepts the same SDK and its logs. Marvelous Digital runs an instance at [glitchtip.marvelous.digital](https://glitchtip.marvelous.digital/).
 
 To turn Sentry Logs on, set in `.env`:
 
@@ -728,7 +728,7 @@ Each event gets a log level, from its fields:
 
 ### During a failure
 
-When the app throws, Sentry and Jot each record a part:
+When the app throws, Sentry and Jot each record part of the story:
 
 | | Sentry or GlitchTip | Jot |
 |---|---|---|
@@ -740,9 +740,9 @@ When the app throws, Sentry and Jot each record a part:
 2. Jot adds `error.type` and `exception.message` to the event. The event gets the level `error`, and sampling always keeps it.
 3. The issue gets the tags `trace_id` and `span_id`, and a "Jot" context that shows `php artisan jot:query <trace_id>`.
 
-From an issue to its events: run that command, see [Reading events](#reading-events). With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
+From an issue to its events: run the command shown in the "Jot" context, see [Reading events](#reading-events). With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
 
-From a user report to the issue: the `X-Request-Id` response header holds the `trace_id`. In Sentry, search the issues for `trace_id:<id>`.
+From a user report to the issue: take the `trace_id` from the `X-Request-Id` response header, then search the Sentry issues for `trace_id:<id>`.
 
 ## Output shapes
 
