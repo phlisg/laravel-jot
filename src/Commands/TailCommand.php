@@ -10,6 +10,9 @@ use MarvelousDigital\WideEvents\Writer;
 use Psr\Log\LogLevel;
 use Symfony\Component\Console\Attribute\AsCommand;
 
+use function Laravel\Prompts\datatable;
+use function Laravel\Prompts\select;
+
 #[AsCommand(name: 'jot:tail')]
 class TailCommand extends Command
 {
@@ -23,7 +26,8 @@ class TailCommand extends Command
         {--since= : Only events newer than this, for example 15m, 2h or 1d}
         {--days=1 : How many days of log files to read}
         {--follow : Keep printing new events as they are written}
-        {--json : Print the events as JSON lines}';
+        {--json : Print the events as JSON lines}
+        {--i|interactive : Browse the events in a table, Enter shows every field}';
 
     protected $description = 'List the most recent wide events in the log files';
 
@@ -49,6 +53,12 @@ class TailCommand extends Command
             $this->where[$key] = $value;
         }
 
+        if ($this->option('interactive') && ($this->option('follow') || $this->option('json'))) {
+            $this->components->error('--interactive cannot be combined with --follow or --json.');
+
+            return self::INVALID;
+        }
+
         if ($since = $this->option('since')) {
             if (! preg_match('/^(\d+)([smhd])$/', (string) $since, $match)) {
                 $this->components->error('Expected --since as a number and a unit, for example 15m, 2h or 1d.');
@@ -66,6 +76,12 @@ class TailCommand extends Command
 
         if ($events === [] && ! $this->option('follow')) {
             $this->components->warn("No matching event in the last {$this->option('days')} days of: ".($files ? implode(', ', $files) : 'no readable log file'));
+        }
+
+        if ($events !== [] && $this->option('interactive') && $this->input->isInteractive()) {
+            $this->browse($files, $events);
+
+            return self::SUCCESS;
         }
 
         foreach ($events as $event) {
@@ -120,6 +136,44 @@ class TailCommand extends Command
         }
 
         return collect($events)->sortBy('timestamp')->values()->slice(-$limit)->values()->all();
+    }
+
+    /**
+     * Shows the events in a table, newest first, then every field of the one picked, until Quit.
+     *
+     * @param  list<string>  $files
+     * @param  list<array<string, mixed>>  $events
+     */
+    protected function browse(array $files, array $events): void
+    {
+        $events = array_reverse($events);
+        $rows = array_map(fn ($event) => [
+            isset($event['timestamp']) ? Carbon::parse((string) $event['timestamp'])->format('H:i:s') : '--:--:--',
+            (string) ($event['entrypoint'] ?? '?'),
+            $this->what($event),
+            (string) ($event['duration_ms'] ?? ''),
+            Str::limit((string) $this->errorMessage($event), 60),
+        ], $events);
+
+        while (true) {
+            $event = $events[datatable(['Time', 'Type', 'What', 'ms', 'Error'], $rows, scroll: min(10, count($rows)), label: 'Recent events', hint: 'Enter shows every field')];
+
+            $this->fields($event);
+
+            do {
+                $next = select('Next', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit']);
+
+                if ($next === 'trace') {
+                    $trace = $this->find($files, (string) $event['trace_id'])->where('trace_id', $event['trace_id'])->sortBy('timestamp')->values();
+                    $this->line("Trace <info>{$event['trace_id']}</info>, {$trace->count()} event(s)");
+                    $this->tree($trace, null, '', $event['span_id']);
+                }
+            } while ($next === 'trace');
+
+            if ($next === 'quit') {
+                return;
+            }
+        }
     }
 
     /**
