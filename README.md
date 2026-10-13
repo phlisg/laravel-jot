@@ -194,13 +194,17 @@ To change a default, run `php artisan jot:install`. It publishes the config file
 
 ### Trace ID on the error page
 
-A user or tester sees the error page, never the response header. Show the trace ID there, so a bug report can quote it. In `resources/views/errors/500.blade.php` (Laravel publishes its own with `php artisan vendor:publish --tag=laravel-errors`):
+A user or tester sees the error page, never the response header. Jot adds the trace ID to Laravel's default 500 page, so a bug report can quote it: "Reference: 4bf92f35…". It shows only with `APP_DEBUG=false`, since debug mode shows Laravel's debug page instead.
+
+An app with its own `resources/views/errors/500.blade.php` keeps it unchanged. Add the ID there with the `@traceId` Blade directive:
 
 ```blade
 @if (jot()->traceId())
-    <p>Error reference: {{ jot()->traceId() }}</p>
+    <p>Reference: @traceId</p>
 @endif
 ```
+
+`JOT_ERROR_PAGE=false` leaves Laravel's default page as it is.
 
 ## Troubleshooting
 

@@ -18,6 +18,8 @@ New:
 - Livewire updates that only poll or refresh are dropped by default (`sampling.drop_livewire_polls`).
 - `console.ignore` skips Composer hooks and dev tools: `package:discover`, `vendor:publish`, `ide-helper:*`, `boost:*`, `filament:upgrade`, `test`.
 - `days`: days of files the default output keeps, 7 by default.
+- Laravel's default 500 page shows the trace ID, so a bug report can quote it. `JOT_ERROR_PAGE=false` turns it off. An app's own 500 page is left alone.
+- `@traceId` prints the trace ID in a Blade view.
 
 ## 0.2.0
 

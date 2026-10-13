@@ -19,6 +19,9 @@ return [
     // Days of files the default output keeps, one file per day.
     'days' => env('JOT_DAYS', 7),
 
+    // Adds the trace ID to Laravel's default 500 page. An app's own errors/500.blade.php is left alone.
+    'error_page' => env('JOT_ERROR_PAGE', true),
+
     // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
     // Events below this level stay out of Sentry: error, warning, notice or info.
     'sentry' => [

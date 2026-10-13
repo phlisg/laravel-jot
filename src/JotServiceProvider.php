@@ -5,6 +5,7 @@ namespace MarvelousDigital\WideEvents;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Support\Facades\Blade;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -35,6 +36,13 @@ class JotServiceProvider extends PackageServiceProvider
     {
         $this->app->make(Kernel::class)->pushMiddleware(Middleware\JotRequest::class);
         $this->app->make(Lifecycle::class)->register($this->app['events']);
+
+        Blade::directive('traceId', fn () => '<?php echo e(jot()->traceId()); ?>');
+
+        // Laravel looks for error views in each view path, then its own: an app's 500 page still wins.
+        if (config('jot.error_page', true)) {
+            config(['view.paths' => [...config('view.paths', []), __DIR__.'/../resources/views']]);
+        }
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             // Collision wraps the app handler in local console runs.

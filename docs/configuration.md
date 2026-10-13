@@ -24,6 +24,7 @@ The `local` and `testing` environments write every event. Every other environmen
 |---|---|---|
 | `outputs` | a daily JSON file | logs go to a log backend. See [Outputs](outputs.md) |
 | `days` | `7` | the server disk is small or large. See [Disk use](../README.md#disk-use) |
+| `error_page` | `true` | the app must keep Laravel's default 500 page unchanged. See [Trace ID on the error page](../README.md#trace-id-on-the-error-page) |
 | `sampling.rate` | `1.0` local, `0.0` elsewhere | you need every request, for example while a tester follows a session |
 | `sampling.client_errors` | `1.0` local, `0.01` elsewhere | 4xx responses matter more or less |
 | `sampling.max_per_minute` | `10` | an outage needs more examples per error |
@@ -56,6 +57,9 @@ return [
 
     // Days of files the default output keeps, one file per day.
     'days' => env('JOT_DAYS', 7),
+
+    // Adds the trace ID to Laravel's default 500 page. An app's own errors/500.blade.php is left alone.
+    'error_page' => env('JOT_ERROR_PAGE', true),
 
     // Added to the outputs on its own when sentry/sentry-laravel is installed with SENTRY_ENABLE_LOGS=true.
     // Events below this level stay out of Sentry: error, warning, notice or info.
