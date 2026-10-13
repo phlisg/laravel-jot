@@ -232,6 +232,33 @@ it('prints JSON lines', function () {
     expect(json_decode(trim(Artisan::output()), true))->toMatchArray(['span_id' => 'aaaabbbbccccdddd', 'http.route' => 'home']);
 });
 
+it('prints a trace as JSON lines', function () {
+    $trace = str_repeat('a', 32);
+    logged('home', ['trace_id' => $trace]);
+    logged('checkout', ['trace_id' => $trace]);
+
+    Artisan::call('jot:query', ['id' => $trace, '--json' => true]);
+
+    expect(array_map(fn ($line) => json_decode($line, true)['http.route'], explode("\n", trim(Artisan::output()))))->toBe(['home', 'checkout']);
+});
+
+it('prints the command or scheduled task and its exit code', function () {
+    logged('', ['entrypoint' => 'console', 'console.command' => 'users:create', 'console.exit_code' => 1]);
+    logged('', ['entrypoint' => 'schedule', 'schedule.task' => 'reports:send', 'schedule.exit_code' => 0]);
+
+    Artisan::call('jot:query');
+
+    expect(Artisan::output())->toContain('users:create exit 1')->toContain('reports:send exit 0');
+});
+
+it('points to Sentry Logs for an event written there', function () {
+    config(['jot.outputs' => [['channel' => 'sentry_logs']]]);
+
+    $this->artisan('jot:query', ['id' => str_repeat('0', 32)])
+        ->expectsOutputToContain('Also in Sentry Logs: search trace_id:')
+        ->doesntExpectOutputToContain('sentry_logs channel');
+});
+
 it('warns when nothing matches', function () {
     logged('home');
 
