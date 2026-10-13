@@ -11,7 +11,7 @@ use MarvelousDigital\WideEvents\Writer;
 /** Runs as if a person were at the terminal. */
 class InteractiveQueryCommand extends QueryCommand
 {
-    protected function interactive(): bool
+    protected function atTerminal(): bool
     {
         return true;
     }
