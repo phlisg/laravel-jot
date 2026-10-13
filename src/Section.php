@@ -20,8 +20,7 @@ abstract class Section
         }
 
         return $prefixes[static::class] ??= Str::snake(
-            str_replace(['Log', 'Section'], '',
-                mb_substr(mb_strrchr('\\'.static::class, '\\'), 1))
+            preg_replace('/(Log|Section)$/', '', class_basename(static::class))
         );
     }
 

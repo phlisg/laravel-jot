@@ -11,6 +11,10 @@ class MySection extends Section {}
 
 class MyOtherSection extends Section {}
 
+class LoginLog extends Section {}
+
+class SectionLogsSection extends Section {}
+
 final class PaymentLog extends Section
 {
     public function __construct(
@@ -95,6 +99,11 @@ describe('prefixes', function () {
 
     it('drops the Log suffix', function () {
         expect(PaymentLog::prefix())->toBe('payment');
+    });
+
+    it('drops Log or Section only at the end of the name', function () {
+        expect(LoginLog::prefix())->toBe('login')
+            ->and(SectionLogsSection::prefix())->toBe('section_logs');
     });
 
     it('inherits an explicit prefix from the parent class', function () {
