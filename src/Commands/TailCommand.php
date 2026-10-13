@@ -58,6 +58,7 @@ class TailCommand extends Command
 
             $unit = ['s' => 'seconds', 'm' => 'minutes', 'h' => 'hours', 'd' => 'days'][$match[2]];
             $this->since = now()->sub($unit, (int) $match[1])->getTimestamp();
+            $this->input->setOption('days', max((int) $this->option('days'), (int) ceil((now()->getTimestamp() - $this->since) / 86400)));
         }
 
         [$files, $elsewhere] = $this->sources();

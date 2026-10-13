@@ -81,6 +81,14 @@ it('keeps only events since a duration', function () {
     $this->artisan('jot:tail', ['--since' => 'an hour'])->assertExitCode(2);
 });
 
+it('reads files old enough for --since', function () {
+    tailed('old', ['timestamp' => now()->subHours(36)->toIso8601String()]);
+    touch(storage_path('logs/jot-tail.log'), now()->subHours(36)->getTimestamp());
+
+    expect(tail())->toBe([])
+        ->and(tail(['--since' => '2d']))->toBe(['old']);
+});
+
 it('prints JSON lines', function () {
     tailed('home', ['span_id' => 'aaaabbbbccccdddd']);
 
