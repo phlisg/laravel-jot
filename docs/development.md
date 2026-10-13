@@ -39,6 +39,8 @@ How to run the tests, try a change on a real app, and release Jot. PHP and Compo
    ./dev pint
    ```
 
+`phpunit.xml.dist` sets `APP_ENV=testing` and a fixed `APP_KEY`, so the suite ignores the `.env` that the workbench build writes into the testbench skeleton. CI has no such file.
+
 > PHPStan's parallel workers run out of memory with the default limit. Pass `--memory-limit=2G`.
 
 The first `./dev` run builds the Docker image, which takes a minute. Later runs reuse it.
