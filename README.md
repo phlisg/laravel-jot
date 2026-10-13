@@ -347,13 +347,15 @@ Every option, the interactive table and `--follow`: [docs/querying.md](docs/quer
 
 ## Levels and volume
 
-Jot sets the level of each event from its fields, and sampling decides which events to write. `jot()->error($e)` records an exception, see [Errors](#errors). `jot()->level()` raises the level of an outcome worth reading, see [Business outcomes](#business-outcomes).
+In `local` and `testing`, Jot writes every event except Livewire polls and dev tool routes. In other environments it writes the events that help debug an incident (errors, slow events, failed commands, events raised with `jot()->level()`) and 1% of 4xx responses, see [Sampling](#sampling). To write more or less, change a rate in `.env` ([Sampling](#sampling)), add a drop or keep rule ([Rules](#rules)), or raise the level of one outcome ([Business outcomes](#business-outcomes)).
 
 ### Levels
 
+Jot sets the level of each event from its fields:
+
 | Level | Events |
 |---|---|
-| `error` | an `error.type` (an uncaught exception or `report()`), a status of 500 or more, a failed job |
+| `error` | an `error.type` (an uncaught exception, `report()` or `jot()->error()`, see [Errors](#errors)), a status of 500 or more, a failed job |
 | `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
 | `notice` | slower than `sampling.slow_ms` (1000 ms) |
 | `info` | every other event |
@@ -376,33 +378,47 @@ An optional `level` key on an `outputs` entry writes only events at that level o
 
 ### Sampling
 
-Jot decides at emit time whether to write the event (tail sampling). Sampling runs before every output, so a dropped event reaches none of them. It decides event by event, so a trace can be partial. It checks, in this order:
+Jot writes or drops each event as this table shows. `APP_ENV` picks the column. The cap is explained after the settings.
 
-1. Always kept, up to the cap in step 2:
-   - level `error`: an `error.type`, a status of 500 or more, a failed job
-   - slower than `sampling.slow_ms`
-   - a failed command or scheduled task (non-zero exit code)
-   - an event raised with `jot()->level()`
-2. Cap: at most `sampling.max_per_minute` (10) such events per minute for each combination of level, `error.type` and route (`http.route`, else `job.name`, `console.command` or `schedule.task`).
-3. Drops: a Livewire poll (see [Polling](docs/livewire.md#polling)), a pattern in `sampling.drop`, a `dropWhen` rule.
-4. Keeps: a `keepWhen` rule keeps an event that no drop matched, whatever the rate.
-5. Rates: a random `sampling.client_errors` share of 4xx responses, a random `sampling.rate` share of all other events.
-
-| Rate | `local`, `testing` | Other environments |
+| Event | `local`, `testing` | Other environments |
 |---|---|---|
-| `sampling.rate` (`JOT_SAMPLE_RATE`) | `1.0` | `0.0` |
-| `sampling.client_errors` (`JOT_SAMPLE_CLIENT_ERRORS`) | `1.0` | `0.01` |
+| Level `error`: an `error.type`, a status of 500 or more, a failed job | written, up to the cap | written, up to the cap |
+| Slower than `sampling.slow_ms` (1000 ms) | written, up to the cap | written, up to the cap |
+| Command or scheduled task with a non-zero exit code | written, up to the cap | written, up to the cap |
+| Raised with `jot()->level()` | written, up to the cap | written, up to the cap |
+| Dev tool route (Laravel Boost, Debugbar, Telescope, Horizon) | dropped | dropped |
+| Livewire poll, see [Polling](docs/livewire.md#polling) | dropped | dropped |
+| 4xx response | written | 1% at random |
+| Any other event | written | none |
 
-The cap:
+The first four rows are the always-kept events. No drop rule removes them, so a failing dev tool route or Livewire poll is still written. A `keepWhen` rule writes a 4xx response or any other event whatever the rate, unless a drop rule matches it first, see [Rules](#rules).
 
-- Why: it protects the disk during an outage. When the database goes down, every request becomes an error.
-- Worst case: 10 events a minute is 14,400 a day, about 14 MB a day for each kind at 950 bytes an event.
-- Where it counts: in the app's default cache store, so a file cache on shared hosting works.
-- Cache failure: the event is kept.
-- File or database cache: the count has no lock, so the cap is approximate under load.
-- Off: `JOT_MAX_PER_MINUTE=null`.
+Jot decides when the event is emitted, at the end of the request, job or command, so the status, duration and error are known (tail sampling). Each event is decided alone, so a trace can be partial. Sampling runs before every output, so a dropped event reaches none of them. The first step that matches decides:
 
-`sampling.drop` ships with a pattern for dev tool routes: Laravel Boost, Debugbar, Telescope and Horizon. These drops apply in every environment.
+| Step | Matches | Result |
+|---|---|---|
+| 1 | an always-kept event | written if under the cap, else dropped |
+| 2 | a Livewire poll, a pattern in `sampling.drop`, a `dropWhen` rule | dropped |
+| 3 | a `keepWhen` rule | written |
+| 4 | a 4xx response | written at the `sampling.client_errors` rate |
+| 5 | any other event | written at the `sampling.rate` rate |
+
+Settings, in the `sampling` key of `config/jot.php`:
+
+| Key | Env variable | `local`, `testing` | Other environments | What it changes |
+|---|---|---|---|---|
+| `rate` | `JOT_SAMPLE_RATE` | `1.0` | `0.0` | share of other events written, from `0.0` to `1.0` |
+| `client_errors` | `JOT_SAMPLE_CLIENT_ERRORS` | `1.0` | `0.01` | share of 4xx responses written |
+| `slow_ms` | none | `1000` | `1000` | duration in milliseconds above which an event is slow |
+| `max_per_minute` | `JOT_MAX_PER_MINUTE` | `10` | `10` | the cap, `null` turns it off |
+| `drop_livewire_polls` | none | `true` | `true` | drops Livewire polls |
+| `drop` | none | dev tool routes | dev tool routes | patterns of events to drop, see [Rules](#rules) |
+
+The cap protects the disk during an outage: when the database goes down, every request becomes an error. Jot counts the always-kept events of each kind per minute and drops those above `max_per_minute`. A kind is one combination of level, `error.type` and route (`http.route`, else `job.name`, `console.command` or `schedule.task`). At 10 a minute, one kind writes at most 14,400 events a day, about 14 MB at 950 bytes an event.
+
+- The count lives in the app's default cache store, so a file cache on shared hosting works.
+- With a file or database cache, the count has no lock, so the cap is approximate under load.
+- When the cache fails, the event is written.
 
 ### Rules
 
@@ -448,14 +464,12 @@ class AppServiceProvider extends ServiceProvider
 
 An N+1 problem is one query per item of a list, where one query for the whole list would do.
 
-Drop rules (`sampling.drop`, the Livewire poll drop, `dropWhen`) win over `keepWhen`. Neither touches an always-kept event.
+Drop rules win over `keepWhen`, and no rule touches an always-kept event, see the steps in [Sampling](#sampling).
 
 ### Recommendations
 
-| Environment | Setting |
+| Situation | Setting |
 |---|---|
-| Local | defaults: every event |
-| Staging, preproduction, production | defaults: the always-kept events and 1% of 4xx responses |
 | Staging, while a tester follows a session | `JOT_SAMPLE_RATE=1.0` for the test, then remove it |
 | Production with Sentry Logs | `JOT_SENTRY_LEVEL=warning` |
 | An alert channel in `outputs` | `'level' => 'error'` |
@@ -464,7 +478,7 @@ Sentry Logs receives each event as a line, and an alert channel notifies on each
 
 ### Business outcomes
 
-A declined payment can return 200 and get the level `info`, which sampling drops. Raise it with `jot()->level()` to keep it:
+A declined payment can return 200 and get the level `info`, which sampling drops outside `local` and `testing`. Raise it with `jot()->level()` to keep it:
 
 ```php
 use Psr\Log\LogLevel;
@@ -476,7 +490,7 @@ jot()->level(LogLevel::WARNING, 'payment declined');
 - The event gets the fields `level.raised`, in lowercase, and `level.reason`. The reason is optional.
 - Each raise replaces `level.reason`. A raise without a reason clears it.
 - A lower level in a later call is ignored. A 500 response stays `error`.
-- Sampling keeps the event even when a drop rule matches it, and output `level` filters see the raised level.
+- Output `level` filters see the raised level.
 
 ## Sentry and GlitchTip
 
