@@ -97,7 +97,7 @@ return [
     // See "Levels and volume" in the README.
     'sampling' => [
         // Share of normal events to keep, from 0.0 to 1.0. Errors, slow events, failed commands
-        // and events raised with jot()->level() are always kept.
+        // and events raised with jot()->raise() are always kept.
         'rate' => env('JOT_SAMPLE_RATE', $local ? 1.0 : 0.0),
         // Share of 4xx responses to keep.
         'client_errors' => env('JOT_SAMPLE_CLIENT_ERRORS', $local ? 1.0 : 0.01),

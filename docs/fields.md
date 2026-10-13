@@ -204,7 +204,7 @@ arch('jot sections')
 
 String keys, enum keys and sections can target the same key. A collision never throws: logging must not break the app, even when `APP_ENV` is set wrong. The README table, [Key collisions](../README.md#key-collisions), sums up each case. The details:
 
-- Jot remembers who wrote each key: a string key, an enum key, a section class, the `Jot::user()` callback or `jot()->level()`. A second write from the same source is a normal update. A write from another source keeps the new value and logs a warning.
+- Jot remembers who wrote each key: a string key, an enum key, a section class, the `Jot::user()` callback or `jot()->raise()`. A second write from the same source is a normal update. A write from another source keeps the new value and logs a warning.
 - Sections are flattened on top of the loose fields when the event is built, so a section property wins over a loose field with the same key, whatever the order of the writes.
 - Sections are stored by prefix. Two classes with one prefix share one slot: adding an instance replaces the other class's instance, and `jot(Other::class)` returns the instance already there. Give each class its own `$prefix`.
 - The fields Jot adds itself, listed in [Automatic fields](#automatic-fields), always win over app fields with the same key. With a user logged in, `jot()->add('user.id', 5)` gives way to that user's ID, with a warning.

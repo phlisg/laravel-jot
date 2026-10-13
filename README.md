@@ -347,7 +347,7 @@ Every option, the interactive table and `--follow`: [docs/querying.md](docs/quer
 
 ## Levels and volume
 
-In `local` and `testing`, Jot writes every event except Livewire polls and dev tool routes. In other environments it writes the events that help debug an incident (errors, slow events, failed commands, events raised with `jot()->level()`) and 1% of 4xx responses, see [Sampling](#sampling). To write more or less, change a rate in `.env` ([Sampling](#sampling)), add a drop or keep rule ([Rules](#rules)), or raise the level of one outcome ([Business outcomes](#business-outcomes)).
+In `local` and `testing`, Jot writes every event except Livewire polls and dev tool routes. In other environments it writes the events that help debug an incident (errors, slow events, failed commands, events raised with `jot()->raise()`) and 1% of 4xx responses, see [Sampling](#sampling). To write more or less, change a rate in `.env` ([Sampling](#sampling)), add a drop or keep rule ([Rules](#rules)), or raise the level of one outcome ([Business outcomes](#business-outcomes)).
 
 ### Levels
 
@@ -359,7 +359,7 @@ Jot sets the level of each event from its fields:
 | `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
 | `notice` | slower than `sampling.slow_ms` (1000 ms) |
 | `info` | every other event |
-| any | raised with `jot()->level()`, which never lowers the level the fields give |
+| any | raised with `jot()->raise()`, which never lowers the level the fields give |
 
 The level is a standard Monolog level on the log line, so a log backend can filter on it too.
 
@@ -385,7 +385,7 @@ Jot writes or drops each event as this table shows. `APP_ENV` picks the column. 
 | Level `error`: an `error.type`, a status of 500 or more, a failed job | written, up to the cap | written, up to the cap |
 | Slower than `sampling.slow_ms` (1000 ms) | written, up to the cap | written, up to the cap |
 | Command or scheduled task with a non-zero exit code | written, up to the cap | written, up to the cap |
-| Raised with `jot()->level()` | written, up to the cap | written, up to the cap |
+| Raised with `jot()->raise()` | written, up to the cap | written, up to the cap |
 | Dev tool route (Laravel Boost, Debugbar, Telescope, Horizon) | dropped | dropped |
 | Livewire poll, see [Polling](docs/livewire.md#polling) | dropped | dropped |
 | 4xx response | written | 1% at random |
@@ -478,12 +478,12 @@ Sentry Logs receives each event as a line, and an alert channel notifies on each
 
 ### Business outcomes
 
-A declined payment can return 200 and get the level `info`, which sampling drops outside `local` and `testing`. Raise it with `jot()->level()` to keep it:
+A declined payment can return 200 and get the level `info`, which sampling drops outside `local` and `testing`. Call `jot()->raise()` to keep it:
 
 ```php
 use Psr\Log\LogLevel;
 
-jot()->level(LogLevel::WARNING, 'payment declined');
+jot()->raise(LogLevel::WARNING, 'payment declined');
 ```
 
 - The level takes a `Psr\Log\LogLevel` constant. An unknown level name is ignored.

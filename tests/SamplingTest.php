@@ -25,7 +25,7 @@ it('always keeps failed commands and scheduled tasks', function () {
         ->and(keeps(['schedule.exit_code' => 2]))->toBeTrue();
 });
 
-it('always keeps events raised with level(), even when a rule drops them', function () {
+it('always keeps events raised with raise(), even when a rule drops them', function () {
     Jot::dropWhen(fn () => true);
 
     expect(keeps(['level.raised' => LogLevel::NOTICE]))->toBeTrue();
@@ -83,7 +83,7 @@ it('limits the always-kept events of one kind per minute', function () {
 });
 
 it('raises the level, never lowers it', function () {
-    jot()->level(LogLevel::WARNING, 'payment declined')->level(LogLevel::NOTICE, 'ignored');
+    jot()->raise(LogLevel::WARNING, 'payment declined')->raise(LogLevel::NOTICE, 'ignored');
 
     expect(jot()->event())->toMatchArray(['level.raised' => 'warning', 'level.reason' => 'payment declined'])
         ->and(Writer::level(jot()->event()))->toBe(LogLevel::WARNING)
@@ -91,7 +91,7 @@ it('raises the level, never lowers it', function () {
 });
 
 it('ignores an unknown level, and writes the reason of the last raise', function () {
-    jot()->level('nonsense', 'ignored')->level('NOTICE', 'slow checkout')->level(LogLevel::ERROR);
+    jot()->raise('nonsense', 'ignored')->raise('NOTICE', 'slow checkout')->raise(LogLevel::ERROR);
 
     expect(jot()->event())->toMatchArray(['level.raised' => 'error'])->not->toHaveKey('level.reason');
 });

@@ -203,7 +203,7 @@ class Jot
      *
      * @param  string  $level  a Psr\Log\LogLevel constant
      */
-    public function level(string $level, ?string $reason = null): static
+    public function raise(string $level, ?string $reason = null): static
     {
         // Logging must never break the app: an unknown level name is ignored.
         $level = rescue(fn () => Level::fromName($level), null, false);
@@ -212,11 +212,11 @@ class Jot
             return $this;
         }
 
-        $this->appendKey('level.raised', $level->toPsrLogLevel(), 'Jot::level()');
+        $this->appendKey('level.raised', $level->toPsrLogLevel(), 'Jot::raise()');
         unset($this->fields['level.reason']);
 
         if ($reason !== null) {
-            $this->appendKey('level.reason', $reason, 'Jot::level()');
+            $this->appendKey('level.reason', $reason, 'Jot::raise()');
         }
 
         return $this;
