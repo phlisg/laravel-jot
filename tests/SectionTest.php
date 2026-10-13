@@ -2,9 +2,12 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use Illuminate\Http\Request;
+use InvalidArgumentException;
 use MarvelousDigital\WideEvents\Attributes\Hide;
 use MarvelousDigital\WideEvents\Attributes\Key;
 use MarvelousDigital\WideEvents\Exceptions\JotSectionRequiresInitialisation;
+use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Section;
 
 class MySection extends Section {}
@@ -143,6 +146,63 @@ describe('section registry', function () {
     it('refuses to create a section with required constructor arguments', function () {
         jot(RequiredArgs::class);
     })->throws(JotSectionRequiresInitialisation::class);
+
+    it('refuses a class that is not a section', function () {
+        jot(\stdClass::class);
+    })->throws(InvalidArgumentException::class);
+
+    it('replaces a section with a second instance of its class, with no warning', function () {
+        $warnings = warnings();
+
+        jot()->add(new StripePayment('pi_1', 100, 10))->add($second = new StripePayment('pi_2', 200, 20));
+
+        expect(jot(StripePayment::class))->toBe($second)
+            ->and(jot()->initialize(Request::create('/'))->event())->toMatchArray(['payment.intent_id' => 'pi_2'])
+            ->and($warnings())->toBe([]);
+    });
+
+    it('keeps one slot for two classes with the same prefix, the last added wins', function () {
+        jot(PaymentLog::class);
+
+        jot()->add($stripe = new StripePayment('pi_1', 100, 10));
+
+        expect(jot(PaymentLog::class))->toBe($stripe);
+    });
+
+    it('stores a section passed under a key at its own prefix, with a warning on another key', function () {
+        $warnings = warnings();
+
+        jot()->add('wrong', $section = new MySection);
+        jot()->add(['my_other' => new MyOtherSection]);
+
+        expect(jot(MySection::class))->toBe($section)
+            ->and(jot()->initialize(Request::create('/'))->event())->not->toHaveKey('wrong')
+            ->and($warnings())->toBe(['[jot] Section '.MySection::class.' was added under key "wrong"; it writes under its own prefix "my".']);
+    });
+});
+
+describe('in the event', function () {
+    it('writes the section properties', function () {
+        jot(PaymentLog::class)->provider = PaymentProvider::Stripe;
+
+        expect(jot()->initialize(Request::create('/'))->event())
+            ->toMatchArray(['payment.provider' => 'stripe', 'payment.attempts' => 0]);
+    });
+
+    it('keeps the section value over a loose field, whatever the order, with a warning', function (bool $sectionFirst) {
+        $warnings = warnings();
+        Jot::fake();
+
+        if ($sectionFirst) {
+            jot(PaymentLog::class);
+        }
+
+        jot()->add('payment.attempts', 9);
+        jot(PaymentLog::class);
+
+        expect(jot()->initialize(Request::create('/'))->emit())->toMatchArray(['payment.attempts' => 0])
+            ->and($warnings())->toBe(['[jot] Key "payment.attempts" was already added by string, then overwritten by '.PaymentLog::class.'.']);
+    })->with(['section first' => true, 'field first' => false]);
 });
 
 it('writes through every call to the same instance', function () {
@@ -196,6 +256,12 @@ describe('flattening', function () {
             'url.path' => '/checkout',
             'route.name' => 'checkout.store',
         ]);
+    });
+
+    it('flattens a map into deeper keys, in snake case', function () {
+        $cart = new Cart(steps: ['firstStep' => 'intent', 'nested' => ['innerKey' => 1]]);
+
+        expect($cart->toDotNotation())->toBe(['cart.steps.first_step' => 'intent', 'cart.steps.nested.inner_key' => 1]);
     });
 
     it('keeps a list as one value', function () {

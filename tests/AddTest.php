@@ -2,11 +2,28 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use Illuminate\Auth\GenericUser;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use MarvelousDigital\WideEvents\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Facades\Jot as JotFacade;
 use MarvelousDigital\WideEvents\Jot;
+use MarvelousDigital\WideEvents\Section;
+use MarvelousDigital\WideEvents\Writer;
 
 enum Field: string
 {
     case ExperimentVariant = 'experiment.variant';
+}
+
+enum Plan: string
+{
+    case Pro = 'pro';
+}
+
+final class Experiment extends Section
+{
+    public function __construct(public ?string $variant = null) {}
 }
 
 /**
@@ -42,10 +59,19 @@ describe('add', function () {
         ]);
     });
 
-    it('keeps the last write', function () {
+    it('keeps the last write, with no warning', function () {
+        $warnings = warnings();
+
         jot()->add('payment.status', 'pending')->add('payment.status', 'declined');
 
-        expect(fields())->toBe(['payment.status' => 'declined']);
+        expect(fields())->toBe(['payment.status' => 'declined'])
+            ->and($warnings())->toBe([]);
+    });
+
+    it('writes a backed enum value as its value', function () {
+        jot()->add('user.plan', Plan::Pro);
+
+        expect(fields())->toBe(['user.plan' => 'pro']);
     });
 });
 
@@ -60,6 +86,20 @@ describe('addIfMissing', function () {
         jot()->add('payment.provider', 'stripe')->addIfMissing('payment.provider', 'paypal');
 
         expect(fields())->toBe(['payment.provider' => 'stripe']);
+    });
+
+    it('keeps the section already there', function () {
+        $first = jot(new Experiment('a'));
+
+        jot()->addIfMissing(new Experiment('b'));
+
+        expect(jot(Experiment::class))->toBe($first);
+    });
+
+    it('adds a section when none is there', function () {
+        jot()->addIfMissing($experiment = new Experiment('b'));
+
+        expect(jot(Experiment::class))->toBe($experiment);
     });
 });
 
@@ -87,6 +127,12 @@ describe('increment', function () {
 
         expect(fields())->toBe(['payment.provider' => 'stripe']);
     });
+
+    it('counts each key of a list by the same step', function () {
+        jot()->increment(['payment.attempts', 'booking.attempts'], 2);
+
+        expect(fields())->toBe(['payment.attempts' => 2, 'booking.attempts' => 2]);
+    });
 });
 
 describe('push', function () {
@@ -100,6 +146,76 @@ describe('push', function () {
         jot()->push('payment.steps', 'charged')->push('payment.steps', 'charged');
 
         expect(fields())->toBe(['payment.steps' => ['charged', 'charged']]);
+    });
+
+    it('appends the same value to each key of a list', function () {
+        jot()->push(['payment.steps', 'booking.steps'], 'charged');
+
+        expect(fields())->toBe(['payment.steps' => ['charged'], 'booking.steps' => ['charged']]);
+    });
+});
+
+describe('collisions', function () {
+    beforeEach(fn () => JotFacade::fake());
+
+    it('keeps the last value of a string key and an enum key with one name, with a warning', function () {
+        $warnings = warnings();
+
+        jot()->add('experiment.variant', 'a')->add(Field::ExperimentVariant, 'b');
+
+        expect(fields())->toBe(['experiment.variant' => 'b'])
+            ->and($warnings())->toBe(['[jot] Key "experiment.variant" was already added by string, then overwritten by enum.']);
+    });
+
+    it('drops a value next to child keys, with a warning', function () {
+        $warnings = warnings();
+
+        $event = jot()->initialize(Request::create('/'))
+            ->add('payment', 'declined')
+            ->add('payment.provider', 'stripe')
+            ->emit();
+
+        expect($event)->not->toHaveKey('payment')->toHaveKey('payment.provider', 'stripe')
+            ->and($warnings())->toBe(['[jot] Key "payment" was already added by string, then overwritten by its child keys.']);
+    });
+
+    it('drops an app value that automatic keys nest under', function () {
+        $event = jot()->initialize(Request::create('/'))->add('http', 'checkout')->event();
+
+        expect($event)->not->toHaveKey('http')
+            ->and(OutputShape::Nested->apply($event)['http'])->toBeArray();
+    });
+
+    it('keeps the automatic value of a key the app writes too, with a warning', function () {
+        $warnings = warnings();
+        Route::get('/', fn () => jot()->add('user.id', 5) ? 'ok' : 'no');
+
+        $this->actingAs(new GenericUser(['id' => 7]))->get('/')->assertOk();
+
+        expect(app(Writer::class)->faked[0])->toHaveKey('user.id', 7)
+            ->and($warnings())->toBe(['[jot] Key "user.id" was already added by string, then overwritten by Jot.']);
+    });
+});
+
+describe('strict mode', function () {
+    it('warns on each string key, never on enum keys or sections', function () {
+        config(['jot.strict' => true]);
+        $warnings = warnings();
+
+        jot()->add('payment.provider', 'stripe')
+            ->add(Field::ExperimentVariant, 'b')
+            ->add(new Experiment('a'));
+
+        expect(fields())->toBe(['payment.provider' => 'stripe', 'experiment.variant' => 'b'])
+            ->and($warnings())->toBe(['[jot] String key "payment.provider" written; declare it in an enum or a section.']);
+    });
+
+    it('is off by default', function () {
+        $warnings = warnings();
+
+        jot()->add('payment.provider', 'stripe');
+
+        expect($warnings())->toBe([]);
     });
 });
 
