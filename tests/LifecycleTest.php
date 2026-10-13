@@ -10,6 +10,7 @@ use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
@@ -294,6 +295,25 @@ it('writes to the configured channel', function () {
     $this->get('/');
 
     expect(file_get_contents($path))->toContain('jot')->toContain('"url.path":"/"');
+});
+
+it('writes to the other outputs when one fails, even if reporting the failure fails too', function () {
+    $path = storage_path('logs/jot-test.log');
+    @unlink($path);
+    app(Writer::class)->faked = null;
+    config([
+        'logging.channels.jot_test' => ['driver' => 'single', 'path' => $path],
+        'jot.outputs' => [
+            ['channel' => 'jot_test', 'level' => 'not-a-level'],
+            ['channel' => 'jot_test', 'shape' => OutputShape::Flat],
+        ],
+    ]);
+    app(ExceptionHandler::class)->reportable(fn (ValueError $e) => throw new RuntimeException('The app log is down too.'));
+    Route::get('/', fn () => 'ok');
+
+    $this->get('/')->assertOk();
+
+    expect(file_get_contents($path))->toContain('"url.path":"/"');
 });
 
 it('writes the IDs once in the default file', function () {

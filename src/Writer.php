@@ -14,6 +14,7 @@ use Monolog\Level;
 use Monolog\Logger as Monolog;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+use Throwable;
 
 /**
  * Singleton: the sampling rules, user resolver and fake outlive the scoped accumulator.
@@ -47,9 +48,9 @@ class Writer
 
         $level = static::level($event);
 
-        // Logging must never break the app.
-        rescue(function () use ($event, $level) {
-            foreach ($this->outputs() as $output) {
+        foreach (rescue(fn () => $this->outputs(), [], false) as $output) {
+            // Logging must never break the app, and a failing output must not stop the next ones.
+            try {
                 if (isset($output['level']) && Level::fromName($level)->isLowerThan(Level::fromName($output['level']))) {
                     continue;
                 }
@@ -58,8 +59,10 @@ class Writer
                 $shape = $shape instanceof OutputShape ? $shape : OutputShape::from($shape);
 
                 $this->channel($output['channel'] ?? null)->log($level, 'jot', $shape->apply($event));
+            } catch (Throwable $e) {
+                rescue(fn () => report($e), null, false);
             }
-        });
+        }
     }
 
     /**
