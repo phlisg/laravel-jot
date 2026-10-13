@@ -2,9 +2,20 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Route;
+use MarvelousDigital\WideEvents\Commands\QueryCommand;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Writer;
+
+/** Runs as if a person were at the terminal. */
+class InteractiveQueryCommand extends QueryCommand
+{
+    protected function interactive(): bool
+    {
+        return true;
+    }
+}
 
 /**
  * @return array{string, string} the trace ID, and the span ID of the job
@@ -44,6 +55,20 @@ it('prints every field of a span, in its trace', function () {
         ->expectsOutputToContain('GET import 500')
         ->expectsOutputToContain($trace)
         ->expectsOutputToContain('job.status')
+        ->assertSuccessful();
+});
+
+it('picks an event from the trace at a terminal', function () {
+    [$trace, $job] = requestWithJob();
+    app(Kernel::class)->registerCommand(app(InteractiveQueryCommand::class));
+
+    $this->artisan('jot:query', ['id' => $trace])
+        ->expectsQuestion("Trace {$trace}, 2 event(s)", $job)
+        ->expectsChoice('Next', 'trace', ['trace' => 'Back to the trace', 'quit' => 'Quit'])
+        ->expectsQuestion("Trace {$trace}, 2 event(s)", $job)
+        ->expectsChoice('Next', 'quit', ['trace' => 'Back to the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('job.status')
+        ->doesntExpectOutputToContain('Run jot:query with a span ID')
         ->assertSuccessful();
 });
 

@@ -108,7 +108,7 @@ class DemoCommand extends Command
         Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true]);
 
         $this->line("jot:query {$trace}");
-        $this->call('jot:query', ['id' => $trace]);
+        $this->call('jot:query', ['id' => $trace, '--no-interaction' => true]);
 
         $job = collect(file(storage_path('logs/jot-'.date('Y-m-d').'.log')))
             ->map(fn ($line) => json_decode($line, true)['context'])
