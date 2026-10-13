@@ -142,3 +142,32 @@ it('shows on each Sentry issue how to find its wide event', function () {
         'link' => "https://logs.example.com/?trace={$trace}",
     ]);
 });
+
+it('adds no tags, context or logs with JOT_SENTRY=false', function () {
+    config(['jot.sentry.enabled' => false]);
+    $transport = sentry();
+    Route::get('/', fn () => \Sentry\captureMessage('boom') && 'ok');
+
+    $this->get('/');
+
+    expect($transport->events[0]->getTags())->not->toHaveKey('trace_id')
+        ->and($transport->events[0]->getContexts())->not->toHaveKey('Jot')
+        ->and(sentryLogs($transport))->toBe([]);
+});
+
+it('sends Sentry only the events that sampling keeps', function () {
+    config(['jot.sampling.rate' => 0.0]);
+    $transport = sentry();
+    Route::get('/', fn () => 'ok');
+
+    $this->get('/');
+
+    expect(sentryLogs($transport))->toBe([]);
+});
+
+it('adds Sentry Logs once when the app lists it as an output', function () {
+    config(['jot.outputs' => [['channel' => 'sentry_logs']]]);
+    sentry();
+
+    expect(array_column(app(Writer::class)->outputs(), 'channel'))->toBe(['sentry_logs']);
+});

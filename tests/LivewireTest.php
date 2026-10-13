@@ -29,8 +29,10 @@ class CheckoutForm extends Component
 
     public function callMountedAction(): void {}
 
+    public function applyCoupon(string $code): void {}
+
     #[On('cart-updated')]
-    public function refreshCart(): void {}
+    public function refreshCart(?string $token = null): void {}
 
     public function render(): string
     {
@@ -105,4 +107,11 @@ it('adds nothing to the first page load', function () {
     $this->get('/checkout')->assertOk();
 
     expect(lastEvent())->toMatchArray(['url.path' => '/checkout'])->not->toHaveKey('livewire.components');
+});
+
+it('never writes call parameters or event payloads', function () {
+    $event = update(['applyCoupon' => ['SECRET-COUPON'], '__dispatch' => ['cart-updated', ['token' => 'tok_secret']]]);
+
+    expect($event)->toMatchArray(['livewire.calls' => ['checkout::applyCoupon'], 'livewire.events' => ['cart-updated']])
+        ->and(json_encode($event))->not->toContain('SECRET-COUPON')->not->toContain('tok_secret');
 });

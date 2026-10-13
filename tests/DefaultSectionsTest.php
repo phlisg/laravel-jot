@@ -79,6 +79,18 @@ describe('client', function () {
         expect(initialized(server: ['REMOTE_ADDR' => '192.168.1.42'])['client.address'])->toBe('192.168.1.42');
     });
 
+    it('writes no IP address when switched off', function () {
+        config(['jot.fields.client.ip' => false]);
+
+        expect(initialized(server: ['REMOTE_ADDR' => '192.168.1.42']))->not->toHaveKey('client.address');
+    });
+
+    it('writes no user agent when switched off', function () {
+        config(['jot.fields.client.user_agent' => false]);
+
+        expect(initialized(server: ['HTTP_USER_AGENT' => 'Mozilla/5.0']))->not->toHaveKey('user_agent.original');
+    });
+
     it('cuts the user agent to 256 characters', function () {
         expect(initialized(server: ['HTTP_USER_AGENT' => str_repeat('a', 300)])['user_agent.original'])
             ->toHaveLength(256);
