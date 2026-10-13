@@ -169,7 +169,7 @@ Run jot:query <trace_id> for a trace, or <span_id> for every field.
 
 #### Browsing
 
-Add `-i` to browse the events in a table. Arrow keys move, `/` searches, and Enter prints every field of the event:
+Add `-i` to browse the events in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the event:
 
 ```sh
 php artisan jot:tail -i --since=1h
@@ -187,7 +187,7 @@ php artisan jot:tail -i --since=1h
 ```
 
 - The newest event is at the top.
-- After the fields, pick Back to the list, Show the trace (the same tree as `jot:query`) or Quit.
+- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the trace's events as the `jot:query` tree, and Enter on any of them prints its fields.
 - The table takes the same filters as the plain list. It can't run together with `--follow` or `--json`.
 - Without a terminal, for example in CI or with `-n`, it prints the plain list.
 
