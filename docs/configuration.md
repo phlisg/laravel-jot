@@ -1,6 +1,6 @@
 # Configuration
 
-Every setting lives in `config/jot.php`. Jot works without the file: its defaults apply until the app publishes it.
+Every setting lives in `config/jot.php`. Jot works without the file: its defaults apply until the app publishes it. Most settings also read a key from `.env`, so changing them needs no edit to the file.
 
 ## Publishing
 
@@ -20,19 +20,41 @@ The `local` and `testing` environments write every event. Every other environmen
 
 ## Settings that need a decision per app
 
-| Setting | Default | Change it when |
-|---|---|---|
-| `outputs` | a daily JSON file | logs go to a log backend. See [Outputs](outputs.md) |
-| `days` | `7` | the server disk is small or large. See [Disk use](../README.md#disk-use) |
-| `error_page` | `true` | the app must keep Laravel's default 500 page unchanged. See [Trace ID on the error page](../README.md#trace-id-on-the-error-page) |
-| `sampling.rate` | `1.0` local, `0.0` elsewhere | you need every request, for example while a tester follows a session |
-| `sampling.client_errors` | `1.0` local, `0.01` elsewhere | 4xx responses matter more or less |
-| `sampling.max_per_minute` | `10` | an outage needs more examples per error |
-| `sampling.drop` | dev tool routes | other noise fills the log. See [Rules](../README.md#rules) |
-| `trace.trust_incoming` | `false` | a proxy sets or strips `traceparent` and `X-Request-Id`. See [Automatic fields](fields.md#automatic-fields) |
-| `app.version` | none | you deploy: set `APP_VERSION` to a commit hash or release tag |
-| `fields.client.ip` | `anonymized` | you have a legal basis under the GDPR (General Data Protection Regulation) for `full` |
-| `fields.query.allow` | empty | you want marketing keys such as `utm_*`. Never tokens |
+Check these before the first deploy.
+
+| Setting | `.env` key | Default | Change it when |
+|---|---|---|---|
+| `outputs` | `JOT_CHANNEL` | a daily JSON file | logs go to a log backend or `stderr`. See [Outputs](outputs.md) |
+| `days` | `JOT_DAYS` | `7` | the server disk is small or large. See [Disk use](../README.md#disk-use) |
+| `app.version` | `APP_VERSION` | none | you deploy: set it to a commit hash or release tag, to tell releases apart |
+| `sampling.rate` | `JOT_SAMPLE_RATE` | `1.0` local, `0.0` elsewhere | you need every request, for example while a tester follows a session |
+| `sampling.client_errors` | `JOT_SAMPLE_CLIENT_ERRORS` | `1.0` local, `0.01` elsewhere | 4xx responses matter more or less |
+| `sampling.max_per_minute` | `JOT_MAX_PER_MINUTE` | `10` | an outage needs more examples per error. Empty: no limit |
+| `sampling.drop` | none | dev tool routes | other noise fills the log. See [Rules](../README.md#rules) |
+| `sentry.level` | `JOT_SENTRY_LEVEL` | `info` | Sentry Logs is on: set `warning` in production. See [Level settings](../README.md#level-settings) |
+| `error_page` | `JOT_ERROR_PAGE` | `true` | the app must keep Laravel's default 500 page unchanged. See [Trace ID on the error page](../README.md#trace-id-on-the-error-page) |
+| `trace.trust_incoming` | `JOT_TRUST_INCOMING_HEADER` | `false` | a proxy sets or strips `traceparent` and `X-Request-Id`. See [Automatic fields](fields.md#automatic-fields) |
+| `fields.client.ip` | none | `anonymized` | you have a legal basis under the GDPR (General Data Protection Regulation) for `full`, or want no IP: `false` |
+| `fields.query.allow` | none | empty | you want marketing keys such as `utm_*`. Never tokens |
+
+## Other settings
+
+The defaults suit most apps.
+
+| Setting | `.env` key | Default | Change it when |
+|---|---|---|---|
+| `enabled` | `JOT_ENABLED` | `true` | Jot must write nothing in one environment |
+| `app.region` | `JOT_REGION` | none | the app runs in more than one region |
+| `sentry.enabled` | `JOT_SENTRY` | `true` | the app uses Sentry but wants no Jot logs, tags or context there |
+| `sentry.link` | `JOT_SENTRY_LINK` | none | a log backend has a URL per trace: Sentry issues then link to it. Placeholders `{trace_id}`, `{span_id}` |
+| `trace.header` | none | `X-Request-Id` | a proxy or client expects the trace ID in another response header |
+| `strict` | `JOT_STRICT` | `false` | the team wants a warning for each loose string key. See [Strict mode](fields.md#strict-mode) |
+| `sampling.slow_ms` | none | `1000` | a request is slow for the app well above or below one second |
+| `sampling.drop_livewire_polls` | none | `true` | you debug Livewire polling |
+| `fields.*` | none | all `true` | a group of [Automatic fields](fields.md#automatic-fields) is unwanted |
+| `queue.enabled` | none | `true` | jobs must write no event |
+| `console.enabled`, `console.schedule` | none | `true` | commands, or scheduled tasks, must write no event |
+| `console.ignore` | none | long-running and dev commands | another command runs for hours or adds noise |
 
 ## The full file
 

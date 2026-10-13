@@ -2,34 +2,105 @@
 
 ## Paid event booking
 
-A user books a paid event: they open the event page, fill in their details, and pay with Stripe. Each step is a separate HTTP request, so each step writes its own wide event.
+A user books a paid event in three requests: they open the event page, fill in their details, and pay with Stripe. Stripe then confirms the payment with a webhook, a fourth request. Each request writes its own wide event, and the app adds the fields it knows at that step.
 
 | Request | Fields added by the app |
 |---|---|
 | `GET /events/{event}` | `booking.event_id`, `booking.event_slug` |
 | `POST /events/{event}/details` | `booking.event_id` |
-| `POST /events/{event}/pay` | `booking.event_id`, `payment.provider=stripe`, `payment.intent_id`, `payment.status` |
-| `POST /stripe/webhook` | `payment.intent_id`, `payment.status` |
+| `POST /events/{event}/pay` | `booking.event_id`, `payment.*` |
+| `POST /stripe/webhook` | `payment.intent_id`, `payment.status`, `payment.trace_id` |
 
-The payment step in code, with the `PaymentLog` section from [Sections](fields.md#sections):
+Jot adds the rest, such as `trace_id`, `http.route`, `user.id` and `session.hash`, see [Automatic fields](fields.md#automatic-fields).
 
-```php
-jot()->add('booking.event_id', $event->id);
+### Steps
 
-$payment = jot(PaymentLog::class);
-$payment->provider = PaymentProvider::Stripe;
-$payment->intentId = $intent->id;
-$payment->status = PaymentStatus::Approved;
-```
+1. Declare the payment fields once, as a [section](fields.md#sections) in `app/Jot`, with backed enums for the values to filter on:
 
-Each request adds what it knows, usually from the route. To follow one user through the funnel, query the log backend on `booking.event_id` plus `session.hash` or `user.id`.
+   ```php
+   namespace App\Jot;
 
-> Outside `local` and `testing`, sampling drops successful requests, so the funnel is complete only where every event is written, see [Sampling](../README.md#sampling).
+   use MarvelousDigital\WideEvents\Section;
 
-### Linking the Stripe webhook
+   final class PaymentLog extends Section
+   {
+       public ?PaymentProvider $provider = null;
+       public ?string $intentId = null;
+       public ?PaymentStatus $status = null;
+       public int $attempts = 0;
+       public ?string $traceId = null;
+   }
 
-The Stripe webhook comes from Stripe's servers, so it has no session and no user, and it starts its own trace. To link it to the payment request:
+   enum PaymentProvider: string
+   {
+       case Stripe = 'stripe';
+   }
 
-1. When creating the payment intent, store the request's trace ID, `jot()->traceId()`, in the intent `metadata`.
-2. In the webhook handler, read it back from the intent and add it as `payment.trace_id`. The name `trace_id` is taken: the webhook event has its own, and automatic fields always win.
-3. Search the log backend for `payment.trace_id=<id>` to find the webhook of a payment request.
+   enum PaymentStatus: string
+   {
+       case Approved = 'approved';
+       case Declined = 'declined';
+   }
+   ```
+
+2. On the event page, add the event ID and slug from the route. The details form adds `booking.event_id` the same way:
+
+   ```php
+   jot()->add([
+       'booking.event_id' => $event->id,
+       'booking.event_slug' => $event->slug,
+   ]);
+   ```
+
+3. In the payment controller, fill the section. Store the trace ID of this request in the intent `metadata`, so the webhook can point back to it:
+
+   ```php
+   $intent = $stripe->paymentIntents->create([
+       'amount' => $event->price_cents,
+       'currency' => 'eur',
+       'metadata' => ['trace_id' => jot()->traceId()],
+   ]);
+
+   jot()->add('booking.event_id', $event->id);
+
+   $payment = jot(PaymentLog::class);
+   $payment->provider = PaymentProvider::Stripe;
+   $payment->intentId = $intent->id;
+   $payment->attempts++;
+   ```
+
+   The event of this request holds:
+
+   ```json
+   {
+     "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+     "http.route": "events.pay",
+     "booking.event_id": 42,
+     "payment.provider": "stripe",
+     "payment.intent_id": "pi_3Nk2",
+     "payment.attempts": 1
+   }
+   ```
+
+4. In the Stripe webhook handler, add the outcome and the trace ID read back from the intent:
+
+   ```php
+   $payment = jot(PaymentLog::class);
+   $payment->intentId = $request->input('data.object.id');
+   $payment->traceId = $request->input('data.object.metadata.trace_id');
+   $payment->status = $request->input('type') === 'payment_intent.succeeded'
+       ? PaymentStatus::Approved
+       : PaymentStatus::Declined;
+   ```
+
+   The webhook comes from Stripe's servers, so its event has no session, no user, and a `trace_id` of its own. `payment.trace_id` holds the trace ID of the payment request instead. The name `trace_id` alone is taken by the automatic field, which always wins, see [Key collisions](fields.md#key-collisions).
+
+5. Query the log backend:
+
+   | To find | Query on |
+   |---|---|
+   | One user's path through the booking | `booking.event_id` plus `session.hash` or `user.id` |
+   | The webhook of a payment request | `payment.trace_id=<trace ID of the payment request>` |
+   | The payment request of a webhook | `trace_id=<payment.trace_id of the webhook>` |
+
+> Outside `local` and `testing`, sampling drops successful requests by default, so the full path shows only where every event is written, see [Sampling](../README.md#sampling). A `keepWhen` rule keeps more, see [Rules](../README.md#rules).

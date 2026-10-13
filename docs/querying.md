@@ -1,55 +1,119 @@
 # Querying events
 
-`php artisan jot:query` reads wide events back from the log files of the server it runs on. The README covers the commands used most, see [Reading events](../README.md#reading-events). This page lists every option.
+`php artisan jot:query` finds wide events in the log files of the server it runs on. Run it on the server that handled the request. The README covers the commands used most, see [Reading events](../README.md#reading-events).
 
-- `jot:query`: the most recent events, with filters.
-- `jot:query <trace_id>`: one trace.
-- `jot:query <span_id>`: one event, with every field.
+| Command | Prints |
+|---|---|
+| `jot:query` | the most recent events, with filters |
+| `jot:query <trace_id>` | every event of one trace, as a tree |
+| `jot:query <span_id>` | the trace tree, then every field of that one event |
 
-At a terminal, it opens an interactive list. Piped, in CI (continuous integration), with `-n` (`--no-interaction`) or with `--json`, it prints plain lines.
+A trace ID (32 hex characters) groups a request with the jobs it queued. A span ID (16 hex characters) names one event. Both appear on every line `jot:query` prints.
 
-It reads the outputs that write files: the default Jot file and any `single` or `daily` channel. For other outputs, such as `stderr` or Sentry Logs, it prints where else to look.
+At a terminal, `jot:query` opens an interactive table, see [Browsing](#browsing). Piped, in CI (continuous integration), with `-n` (`--no-interaction`) or with `--json`, it prints plain lines, as in the samples below.
 
-For a live stream of all log messages, Jot events included, run `php artisan pail`.
+## Find one request
 
-## Recent events
+1. Get the trace ID. The response header `X-Request-Id` holds it (the name is set by `trace.header` in `config/jot.php`). Without it, find the request by its fields, see [Filter](#filter):
+   ```sh
+   php artisan jot:query --where=http.route=jobs.failing --since=1h
+   ```
+   ```
+   12:36:19  59fa87208b9aaecf63c39f0506dc663a  http  0b700b4686654677  POST jobs.failing 200  20ms
+   Run jot:query <trace_id> for a trace, or <span_id> for every field.
+   ```
+   Each line holds the time, the trace ID, the entry point (`http`, `queue`, `console` or `schedule`), the span ID, then what ran, its status, its duration and its error.
+2. Print the trace. Each event sits under the event that started it (its `parent_span_id`), so a queued job sits under the request:
+   ```sh
+   php artisan jot:query 59fa87208b9aaecf63c39f0506dc663a
+   ```
+   ```
+   Trace 59fa87208b9aaecf63c39f0506dc663a, 2 event(s)
+   http  0b700b4686654677  POST jobs.failing 200  20ms
+   └─ queue  73e837d98f1733c0  ChargeCard failed  9ms  RuntimeException: Card network timeout
+   Run jot:query with a span ID for every field of that event.
+   ```
+3. Print every field of one event with its span ID. The tree comes first, `◀` marks the event:
+   ```sh
+   php artisan jot:query 73e837d98f1733c0
+   ```
+   ```
+   Trace 59fa87208b9aaecf63c39f0506dc663a, 2 event(s)
+   http  0b700b4686654677  POST jobs.failing 200  20ms
+   └─ queue  73e837d98f1733c0  ChargeCard failed  9ms  RuntimeException: Card network timeout ◀
 
-Without an ID, `jot:query` lists the most recent events, oldest first, one line per event: time, trace ID, then a summary of the event.
+     73e837d98f1733c0 ...........................................................
+     trace_id .................................. 59fa87208b9aaecf63c39f0506dc663a
+     span_id ................................................... 73e837d98f1733c0
+     parent_span_id ............................................ 0b700b4686654677
+     entrypoint ........................................................... queue
+     job.status .......................................................... failed
+     ...
+   ```
+
+With an ID, `jot:query` reads `jot.days` (7) days of files. It accepts `--days` and `--json` only, and refuses the filters.
+
+When nothing matches, it names the files it read:
+
+```
+WARN  No event with ID ffffffffffffffffffffffffffffffff in the last 7 days of: storage/logs/jot-2026-10-13.log.
+```
+
+Check that the request reached this server and that the event was kept, see [Troubleshooting](../README.md#troubleshooting) for the usual causes.
+
+## Filter
+
+Without an ID, `jot:query` lists the last 20 matching events of the files written in the last day, oldest first. Filters combine: an event must match all of them.
 
 ```sh
-php artisan jot:query                                   # last 20 events from today's files
-php artisan jot:query --limit=50 --since=15m
-php artisan jot:query --errors                          # error.type set, 5xx status or failed job
-php artisan jot:query --slow                            # slower than jot.sampling.slow_ms
-php artisan jot:query --where=http.route=events.* --where=user.id=42
-php artisan jot:query --where=entrypoint=queue,schedule  # jobs and scheduled tasks
-php artisan jot:query --follow                          # keep printing new events, Ctrl+C to stop
-php artisan jot:query --json                            # one JSON line per event
+php artisan jot:query --errors                                     # level error: error.type, 5xx status or failed job
+php artisan jot:query --slow                                       # slower than sampling.slow_ms (1000 ms)
+php artisan jot:query --since=15m --limit=50
+php artisan jot:query --where='http.route=events.*' --where=user.id=42
+php artisan jot:query --where=entrypoint=queue,schedule             # jobs and scheduled tasks
 ```
 
+With `--errors`:
+
 ```
-06:47:00  555ee94c04b56b2e7b91a58635e1a1f8  http  d7a93d989a9b145b  GET events.show 200  5ms
-06:47:00  7b096114f4407571aa14af9f01e5ef9d  http  13cbb92ae552c95a  POST events.details 200  0ms
-06:47:00  f682e78131053797dc9bb24718dd5ee7  http  f753e791229612e7  POST events.pay 200  1ms
-06:47:00  e3a6df5d662b366fad87a7969a4ff985  http  c6b2d9316c7f6888  POST stripe.webhook 204  1ms
+12:36:19  59fa87208b9aaecf63c39f0506dc663a  queue  73e837d98f1733c0  ChargeCard failed  9ms  RuntimeException: Card network timeout
 Run jot:query <trace_id> for a trace, or <span_id> for every field.
 ```
 
-- `--limit`: how many events to list, `20` by default.
-- `--where`: `key=value` on the flat field names, with `*` wildcards. Commas list alternatives: `--where=entrypoint=http,queue`. Repeat `--where` to require several fields.
-- `--errors`: events with an `error.type`, a 5xx status or a failed job.
-- `--slow`: events slower than `sampling.slow_ms` (1000 ms).
-- `--since`: a number and a unit (`s`, `m`, `h` or `d`), such as `15m`.
-- `--days=1`: how many days of files to read. `--since` reads further back when it needs to.
-- `--follow`: prints new events as they are written, as plain lines, even at a terminal.
+`--where` takes `key=value` on the flat field names of [Fields](fields.md):
 
-These options work without an ID only. With an ID, `jot:query` refuses all of them except `--days` and `--json`.
+- `*` is a wildcard: `--where='http.route=events.*'`.
+- Commas list alternatives: `--where=entrypoint=http,queue`.
+- A list field, such as `livewire.calls`, is compared as JSON, so wrap the pattern in `*`: `--where='livewire.calls=*::submit*'`.
+- An event without the field never matches.
 
-When nothing matches, `jot:query` names the files it read. See [Troubleshooting](../README.md#troubleshooting) for the usual causes.
+## Follow live
+
+`--follow` prints the matching events, then each new one as it is written, until Ctrl+C. It prints plain lines, even at a terminal, and takes the same filters:
+
+```sh
+php artisan jot:query --follow --errors
+```
+
+For a live stream of all log messages, Jot events included, run `php artisan pail`.
+
+## JSON for scripts
+
+`--json` prints one JSON object per line, with flat field names, and no hint line. It works with a list, a trace or `--follow`:
+
+```sh
+php artisan jot:query --where=entrypoint=queue --limit=1 --json
+```
+
+```json
+{"trace_id":"59fa87208b9aaecf63c39f0506dc663a","span_id":"73e837d98f1733c0","parent_span_id":"0b700b4686654677","timestamp":"2026-10-13T12:36:19+00:00","entrypoint":"queue","duration_ms":9,"job.name":"Workbench\\App\\Jobs\\ChargeCard","job.status":"failed","error.type":"RuntimeException","exception.message":"Card network timeout"}
+```
+
+The sample is shortened: a real line holds every field of the event. Pipe it to `jq`, for example `| jq -r '.["job.name"]'`.
 
 ## Browsing
 
-At a terminal, the recent events open in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the selected event:
+At a terminal, the recent events open in a table, newest at the top:
 
 ```sh
 php artisan jot:query --since=1h
@@ -68,32 +132,37 @@ php artisan jot:query --since=1h
 └──────────┴───────┴───────────────────────┴────┴─────────────────────────┘
 ```
 
-- The newest event is at the top, where the cursor starts. The plain list prints oldest first, like `tail`, so the newest line sits next to the prompt.
-- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the events of the trace as a tree, see [One trace](#one-trace). Enter on any of them prints its fields.
-- The table takes the same filters as the plain list.
+| Key | Does |
+|---|---|
+| Arrow keys | move |
+| `/` | search the rows, trace and span IDs included |
+| `r` | reload the events |
+| Enter | print every field of the event |
 
-## One trace
+After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the events of the trace as a tree, and Enter on any of them prints its fields. The table takes the same filters as the plain list.
 
-With a trace ID, `jot:query` prints the events of the trace as a tree. `parent_span_id` places each event under the one that started it:
+A trace ID with several events opens the same tree list. A span ID, or a trace with one event, prints as in [Find one request](#find-one-request).
 
-```sh
-php artisan jot:query 4bf92f3577b34da6a3ce929d0e0e4736
-```
+## Options
 
-```
-Trace 4bf92f3577b34da6a3ce929d0e0e4736, 2 event(s)
-http  f56220033574661e  POST checkout.store 200  412ms
-└─ queue  69f6835287391bf7  ChargeCard failed  10ms  RuntimeException: Card network timeout
-```
+| Option | Default | Does |
+|---|---|---|
+| `--limit` | `20` | how many recent events to list |
+| `--where` | none | `key=value` field filter, repeatable, see [Filter](#filter) |
+| `--errors` | off | only events at level `error`: an `error.type`, a 5xx status or a failed job |
+| `--slow` | off | only events slower than `sampling.slow_ms` (1000 ms) |
+| `--since` | none | only events newer than a number and a unit (`s`, `m`, `h` or `d`), such as `15m`. Reads more days of files when needed |
+| `--days` | `1` without an ID, `jot.days` (7) with one | how many days of files to read, by modification time |
+| `--follow` | off | keep printing new events, see [Follow live](#follow-live) |
+| `--json` | off | one JSON line per event, see [JSON for scripts](#json-for-scripts) |
 
-Arguments:
+Only `--days` and `--json` work with an ID.
 
-- Trace ID (32 hex characters): prints the whole trace. The `X-Request-Id` response header holds it.
-- Span ID (16 hex characters): prints the same tree, then every field of that event.
+## Where it reads
 
-Options:
+`jot:query` reads the outputs that write files: the default Jot file and any `single` or `daily` log channel. An event written to two of them prints once. For the other outputs, it prints a hint instead:
 
-- `--days`: how many days of files to read, `jot.days` (7) by default.
-- `--json`: one JSON line per event.
+- Sentry Logs: `Also in Sentry Logs.`, and with an ID, `Also in Sentry Logs: search trace_id:<trace_id>.`
+- Any other channel, such as `stderr`: `Also written to the <channel> channel, which jot:query cannot read.`
 
-At a terminal, a trace with several events opens as a list laid out as the tree. Enter on an event prints every field, then offers Back to the trace or Quit. A span ID, or a trace with a single event, prints the tree as above.
+See [Outputs](outputs.md) to configure them.
