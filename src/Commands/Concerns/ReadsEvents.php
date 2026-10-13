@@ -103,23 +103,29 @@ trait ReadsEvents
     }
 
     /**
+     * The trace as indented lines with branch characters, keyed by span ID, the marked span pointed at.
+     *
      * @param  Collection<int, array<string, mixed>>  $events
+     * @return array<array-key, string>
      */
-    protected function tree(Collection $events, ?string $parent, string $indent, ?string $marked): void
+    protected function tree(Collection $events, ?string $marked, ?string $parent = null, string $indent = ''): array
     {
         $spans = $events->pluck('span_id')->all();
         $children = $events->filter(fn ($event) => $parent === null
             ? ! in_array($event['parent_span_id'] ?? null, $spans, true)
             : ($event['parent_span_id'] ?? null) === $parent);
+        $lines = [];
 
         foreach ($children->values() as $i => $event) {
             $last = $i === $children->count() - 1;
             $branch = $parent === null ? '' : ($last ? '└─ ' : '├─ ');
             $mark = $event['span_id'] === $marked ? ' <info>◀</info>' : '';
 
-            $this->line($indent.$branch.$this->summary($event).$mark);
-            $this->tree($events, $event['span_id'], $parent === null ? '' : $indent.($last ? '   ' : '│  '), $marked);
+            $lines[$event['span_id']] = $indent.$branch.$this->summary($event).$mark;
+            $lines += $this->tree($events, $marked, $event['span_id'], $parent === null ? '' : $indent.($last ? '   ' : '│  '));
         }
+
+        return $lines;
     }
 
     /**

@@ -39,7 +39,9 @@ class QueryCommand extends Command
             $events->each(fn ($event) => $this->line(json_encode($event, JSON_UNESCAPED_SLASHES)));
         } else {
             $this->line("Trace <info>{$trace}</info>, {$events->count()} event(s)");
-            $this->tree($events, null, '', $span['span_id'] ?? null);
+            foreach ($this->tree($events, $span['span_id'] ?? null) as $line) {
+                $this->line($line);
+            }
 
             if ($span) {
                 $this->newLine();

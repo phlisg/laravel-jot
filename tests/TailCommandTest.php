@@ -132,12 +132,28 @@ it('browses the events in a table', function () {
     Prompt::fake([Key::DOWN, Key::ENTER]);
 
     $this->artisan('jot:tail', ['-i' => true])
-        ->expectsChoice('Next', 'trace', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
         ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
         ->expectsOutputToContain('Recent events')
         ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
         ->doesntExpectOutputToContain('user.id')
-        ->expectsOutputToContain('1 event(s)')
+        ->assertSuccessful();
+});
+
+it('picks another event from the trace', function () {
+    $trace = str_repeat('t', 32);
+    tailed('parent', ['trace_id' => $trace, 'span_id' => 'aaaaaaaaaaaaaaaa', 'user.id' => 7, 'timestamp' => now()->subMinute()->toIso8601String()]);
+    tailed('child', ['trace_id' => $trace, 'span_id' => 'bbbbbbbbbbbbbbbb', 'parent_span_id' => 'aaaaaaaaaaaaaaaa']);
+
+    Prompt::fake([Key::ENTER]);
+
+    $this->artisan('jot:tail', ['-i' => true])
+        ->expectsChoice('Next', 'trace', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsChoice("Trace {$trace}, 2 event(s)", 'aaaaaaaaaaaaaaaa', [
+            'aaaaaaaaaaaaaaaa' => 'http  aaaaaaaaaaaaaaaa  GET parent 200  5ms',
+            'bbbbbbbbbbbbbbbb' => '└─ http  bbbbbbbbbbbbbbbb  GET child 200  5ms ◀',
+        ])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('user.id')
         ->assertSuccessful();
 });
 
