@@ -15,6 +15,7 @@ use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Writer;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Workbench\App\Jobs\ChargeCard;
 
 /** Runs as if the output were a terminal. */
 class InteractiveQueryCommand extends QueryCommand
@@ -62,7 +63,7 @@ function atTerminal(): void
  */
 function requestWithJob(): array
 {
-    Route::get('/import', fn () => SyncJob::dispatch(fail: true) && 'ok')->name('import');
+    Route::get('/import', fn () => ChargeCard::dispatch(42) && 'ok')->name('import');
 
     $trace = test()->get('/import')->headers->get('X-Request-Id');
     preg_match('/"span_id":"([0-9a-f]{16})","parent_span_id"/', file_get_contents(storage_path('logs/jot-query.log')), $match);
@@ -109,7 +110,7 @@ it('prints a trace as a tree', function () {
 
     $this->artisan('jot:query', ['id' => $trace])
         ->expectsOutputToContain('GET import 500')
-        ->expectsOutputToContain("└─ queue  {$job}  SyncJob failed")
+        ->expectsOutputToContain("└─ queue  {$job}  ChargeCard failed")
         ->assertSuccessful();
 });
 
