@@ -2,6 +2,22 @@
 
 How Jot collects fields during a unit of work (a request, job, command or scheduled task) and writes them as one event. For usage, see the [README](../README.md).
 
+## Contents
+
+- [Classes](#classes)
+- [Context](#context)
+- [Units of work](#units-of-work)
+  - [Request](#request)
+  - [Queue](#queue)
+  - [Console](#console)
+  - [Scheduler](#scheduler)
+  - [Livewire](#livewire)
+- [The stack](#the-stack)
+- [Building the event](#building-the-event)
+- [Writing](#writing)
+- [Open questions](#open-questions)
+- [Out of scope](#out-of-scope)
+
 ```
  HTTP request           queued or sync job       artisan command        scheduled task
       │                        │                        │                      │

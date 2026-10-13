@@ -2,6 +2,26 @@
 
 How to run the tests, try a change on a real app, and release Jot. PHP and Composer run in Docker, so the host needs Docker with the Compose plugin (`docker compose version` prints a version) and no PHP.
 
+## Contents
+
+- [Run the tests](#run-the-tests)
+  - [How ./dev works](#how-dev-works)
+- [Run on another PHP version](#run-on-another-php-version)
+- [Run on Livewire 3](#run-on-livewire-3)
+- [What CI runs](#what-ci-runs)
+- [Measure coverage](#measure-coverage)
+- [Try a change in the workbench](#try-a-change-in-the-workbench)
+  - [Setup](#setup)
+  - [Scenarios](#scenarios)
+  - [Server](#server)
+  - [Output](#output)
+  - [New scenario](#new-scenario)
+- [Record the GIFs](#record-the-gifs)
+- [Where a check belongs](#where-a-check-belongs)
+- [Documentation](#documentation)
+- [Releases](#releases)
+  - [Install from another project](#install-from-another-project)
+
 ## Run the tests
 
 1. Install the dependencies, once:
@@ -184,7 +204,7 @@ When editing:
 - One home per fact. The list of always-kept events lives in "Sampling" in the README, other places link to it.
 - `docs/configuration.md` holds `config/jot.php` verbatim, minus `<?php`. Update both together.
 - Comments in `src/` and `config/jot.php` point to headings by name ("Sampling", "Levels and volume", "Key collisions", "Flattening rules", "Context"). Renaming a heading means `grep -rn "README\|docs/" src config`.
-- The README Contents lists every H2 and H3. Check anchors after renaming one.
+- The README Contents lists every H2 and H3, and so does the Contents of each page in `docs/` with three or more. Update it after adding or renaming a heading, then check anchors.
 - State behaviour only after checking it in `src/`, and numbers only when measured. The disk table uses about 950 bytes per event, measured in one app.
 - An upgrade step goes to the CHANGELOG entry of the release and to "Upgrading" in the README.
 

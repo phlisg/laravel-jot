@@ -2,6 +2,14 @@
 
 Every setting lives in `config/jot.php`. Jot works without the file: its defaults apply until the app publishes it. Most settings also read a key from `.env`, so changing them needs no edit to the file.
 
+## Contents
+
+- [Publishing](#publishing)
+- [Environment defaults](#environment-defaults)
+- [Settings that need a decision per app](#settings-that-need-a-decision-per-app)
+- [Other settings](#other-settings)
+- [The full file](#the-full-file)
+
 ## Publishing
 
 ```sh

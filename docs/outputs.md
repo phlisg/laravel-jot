@@ -2,6 +2,22 @@
 
 An output is one place where Jot writes its events: a Laravel log channel, plus the shape of the event array. Out of the box Jot has one output, a daily JSON file in `storage/logs` that `php artisan jot:query` reads. Add an output to send events to a log backend, `stderr` or an OpenTelemetry Collector.
 
+## Contents
+
+- [Which shape to use](#which-shape-to-use)
+- [Adding an output](#adding-an-output)
+  - [Default file](#default-file)
+  - [A JSON file for a log shipper](#a-json-file-for-a-log-shipper)
+  - [Warnings and errors on stderr](#warnings-and-errors-on-stderr)
+  - [OpenTelemetry Collector](#opentelemetry-collector)
+  - [Sentry Logs](#sentry-logs)
+- [Formatter](#formatter)
+- [Output shapes](#output-shapes)
+  - [Flat](#flat)
+  - [Nested](#nested)
+  - [Otel](#otel)
+- [Outputs that jot:query reads](#outputs-that-jotquery-reads)
+
 ## Which shape to use
 
 | Destination | Shape |

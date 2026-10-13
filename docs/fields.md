@@ -2,6 +2,23 @@
 
 A wide event holds two kinds of fields: the ones the app adds with `jot()`, and the ones Jot adds by itself, listed in [Automatic fields](#automatic-fields). The short version is in the README, see [Adding fields](../README.md#adding-fields).
 
+## Contents
+
+- [Methods](#methods)
+  - [Facade](#facade)
+- [Loose fields](#loose-fields)
+  - [Strict mode](#strict-mode)
+- [Sections](#sections)
+  - [Flattening rules](#flattening-rules)
+  - [Attributes](#attributes)
+  - [Where sections live](#where-sections-live)
+- [Key collisions](#key-collisions)
+- [Field conventions](#field-conventions)
+- [Automatic fields](#automatic-fields)
+  - [Errors](#errors)
+  - [Login example](#login-example)
+  - [App fields](#app-fields)
+
 Fields never carry over from one request to the next, and each job, command or scheduled task starts with none.
 
 ## Methods
