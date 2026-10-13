@@ -210,8 +210,13 @@ class TailCommand extends Command
                 fclose($handle);
             }
 
-            usleep(500_000);
+            $this->pause();
         }
+    }
+
+    protected function pause(): void
+    {
+        usleep(500_000);
     }
 
     /**
