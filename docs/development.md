@@ -134,7 +134,7 @@ tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).
 Versions come from git tags, `v` plus a semantic version, for example `v0.1.0`. Composer reads them directly, so `composer.json` holds no `version` field. The `release` workflow (`.github/workflows/release.yml`) runs the test suite on each pushed tag, then creates the GitHub release.
 
 1. Start the release from `develop`: `git flow release start 0.1.0`.
-2. Preview the notes: `bin/release-notes HEAD`.
+2. Preview the notes: `bin/release-notes HEAD`. The preview lists the commits only: the `CHANGELOG.md` section joins the notes once the tag exists.
 3. Optional: add a `## 0.1.0` section to `CHANGELOG.md` for what commit subjects cannot say, such as how to upgrade past a breaking change. Commit it.
 4. Finish: `git flow release finish 0.1.0`. git-flow merges into `master` and `develop`, and tags `v0.1.0`.
 5. Push: `git push origin master develop && git push --tags`.
@@ -152,15 +152,7 @@ Other types, such as `build:`, `test:` or `style:`, stay out of the notes. A com
 
 ### Install from another project
 
-The repository is private, so Composer reads it from GitHub directly, with the GitHub token in the project's `auth.json`. In the other project's `composer.json`:
+Set up the token and the repository as in [Installation](../README.md#installation). Then:
 
-```json
-"repositories": [
-    { "type": "vcs", "url": "git@github.com:Marvelous-Digital/laravel-wide-events.git" }
-]
-```
-
-Then:
-
-- A release: `composer require marvelous-digital/laravel-wide-events:^0.1`
-- The latest `develop`, before any tag: `composer require marvelous-digital/laravel-wide-events:dev-develop`
+- A release: `composer require marvelous-digital/laravel-wide-events:^0.2`
+- Unreleased work on `develop`: `composer require marvelous-digital/laravel-wide-events:dev-develop`
