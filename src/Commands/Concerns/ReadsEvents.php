@@ -156,7 +156,7 @@ trait ReadsEvents
      *
      * @param  array<string, mixed>  $event
      */
-    protected function what(array $event): string
+    protected function describe(array $event): string
     {
         $what = match ($event['entrypoint'] ?? null) {
             'http' => [$event['http.request.method'] ?? null, $event['http.route'] ?? $event['url.path'] ?? null, $event['http.response.status_code'] ?? null],
@@ -187,7 +187,7 @@ trait ReadsEvents
         return implode('  ', array_filter([
             '<comment>'.($event['entrypoint'] ?? '?').'</comment>',
             $event['span_id'],
-            $this->what($event),
+            $this->describe($event),
             isset($event['duration_ms']) ? "{$event['duration_ms']}ms" : null,
             $error === null ? null : "<error>{$error}</error>",
         ]));
@@ -238,14 +238,17 @@ trait ReadsEvents
     }
 
     /**
-     * Shows the event's fields until the user picks a non-trace choice.
+     * Shows the event's fields, and its trace on request, until the user picks Quit or Back to the list.
      *
      * @param  list<string>  $files
      * @param  array<string, mixed>  $event
-     * @param  array<string, string>  $choices  the 'trace' key shows the trace
      */
-    protected function inspect(array $files, array $event, array $choices): string
+    protected function inspect(array $files, array $event, bool $fromList = false): string
     {
+        $choices = $fromList
+            ? ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit']
+            : ['trace' => 'Back to the trace', 'quit' => 'Quit'];
+
         do {
             $this->printFields($event);
             $next = (string) select('Next', $choices);
