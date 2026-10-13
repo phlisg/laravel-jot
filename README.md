@@ -22,7 +22,12 @@ Laravel Wide Events writes one structured log event ("wide event") per HTTP requ
 - [Livewire](#livewire)
 - [Example: paid event booking](#example-paid-event-booking)
 - [Errors](#errors)
-- [Sampling](#sampling)
+- [Levels and volume](#levels-and-volume)
+  - [Levels](#levels)
+  - [Output levels](#output-levels)
+  - [Sampling](#sampling)
+  - [Recommendations](#recommendations)
+  - [Business outcomes](#business-outcomes)
 - [Sentry and GlitchTip](#sentry-and-glitchtip)
 - [Output shapes](#output-shapes)
 - [Testing](#testing)
@@ -313,12 +318,12 @@ return [
 
 Settings that need a decision per app:
 
-- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Sentry and GlitchTip](#sentry-and-glitchtip) for the levels.
+- `outputs`: each entry pairs a log channel from `config/logging.php` with a shape, see [Output shapes](#output-shapes). The channel's formatter encodes the event (JSON, logfmt, and so on). Use a JSON formatter so the log backend can index each field. An optional `level` key keeps only events at that level or above, see [Levels and volume](#levels-and-volume).
 - `trace.trust_incoming`: off by default, so that clients cannot choose their own trace ID. Turn it on behind a proxy or load balancer that sets or strips the `traceparent` and `X-Request-Id` headers. A trusted W3C `traceparent` header sets `trace_id` and `parent_span_id`. A trusted `X-Request-Id` header goes to `http.request.header.x-request-id`.
 - `app.version`: value of the `service.version` field, a git commit hash or release tag, to compare errors between deploys.
 - `fields.client.ip`: `anonymized` by default. `full` needs a legal basis under the GDPR.
 - `fields.query.allow`: empty by default. Add marketing keys such as `utm_*`, never tokens or signatures.
-- `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%.
+- `sampling.rate`: lower it when log volume costs too much. Errors and slow events stay at 100%. See [Levels and volume](#levels-and-volume) for the choices per environment.
 
 ## Sections
 
@@ -691,12 +696,44 @@ try {
 
 - `rescue(fn () => ...)` reports too.
 - With several exceptions, `error.*` describes the last one, usually the one that ended the request. `error.count` shows the others exist, and Sentry holds each of them, see [During a failure](#during-a-failure).
-- An event with `error.type` gets the level `error`, even with a 200 response: `report()` means the exception needs attention. Sampling always keeps it.
+- An event with `error.type` gets the level `error`, even with a 200 response: `report()` means the exception needs attention. Sampling always keeps it, see [Levels and volume](#levels-and-volume).
 - Exceptions Laravel does not report, such as validation errors and 404s, add nothing.
 
-## Sampling
+## Levels and volume
 
-The package decides at emit time whether to write the event (tail sampling). It keeps:
+Jot sets the level of each event from its fields, so the app never sets one. To limit volume, give a minimum level to paid or noisy outputs, and lower the sampling rate only when the main log costs too much.
+
+A wide event describes how a request, job, command or scheduled task ended, so the package has no `jot()->info()` or `jot()->error()`.
+
+### Levels
+
+| Level | Events |
+|---|---|
+| `error` | an `error.type` (an uncaught exception or `report()`), a status of 500 or more, a failed job |
+| `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
+| `notice` | slower than `sampling.slow_ms` |
+| `info` | every other event |
+
+The level is a standard Monolog level on the log line, so a log backend can filter on it too.
+
+### Output levels
+
+An optional `level` key on an `outputs` entry writes only events at that level or above. Each output filters on its own, so the main log keeps everything while a second output gets only the problems:
+
+```php
+'outputs' => [
+    ['channel' => env('JOT_CHANNEL'), 'shape' => OutputShape::Flat],
+    ['channel' => 'stderr', 'shape' => OutputShape::Flat, 'level' => 'warning'],
+],
+```
+
+`stderr` is a channel of Laravel's default `config/logging.php`. Sentry Logs has its own setting, `JOT_SENTRY_LEVEL`, see [Sentry and GlitchTip](#sentry-and-glitchtip).
+
+> The channel's own `level` in `config/logging.php` filters too. Laravel's `slack` channel uses `LOG_LEVEL`, or `critical` when it is unset. Jot never writes above `error`, so `critical` drops every event.
+
+### Sampling
+
+The package decides at emit time whether to write the event (tail sampling). Sampling runs before every output, so a dropped event reaches none of them. It keeps:
 
 - Every event with `http.response.status_code` of 500 or more, a failed job, or an `error.type`.
 - Every event slower than `sampling.slow_ms`.
@@ -711,6 +748,24 @@ Register rules in a service provider:
 Jot::keepWhen(fn (array $event) => ($event['user.plan'] ?? null) === 'enterprise');
 Jot::dropWhen(fn (array $event) => ($event['http.route'] ?? null) === 'health');
 ```
+
+### Recommendations
+
+- Local and staging: keep everything. `sampling.rate` stays at `1.0`, no output has a `level`.
+- Production, main log (file or log backend): keep everything. Lower `JOT_SAMPLE_RATE` only when the volume costs too much.
+- Production, paid or noisy outputs: set a level, for example `JOT_SENTRY_LEVEL=warning` for Sentry Logs and `error` for an alert channel.
+
+A level filter drops the context around a failure: the earlier requests of the same user, and the normal traffic to compare with. Sampling keeps a representative share of that traffic.
+
+### Business outcomes
+
+An outcome that matters to the app can end with the level `info`, such as a declined payment with a 200 response. A `keepWhen` rule keeps it at any sampling rate:
+
+```php
+Jot::keepWhen(fn (array $event) => ($event['payment.status'] ?? null) === 'declined');
+```
+
+The level stays `info`, so an output with a `level` key still skips the event.
 
 ## Sentry and GlitchTip
 
@@ -728,16 +783,7 @@ SENTRY_ENABLE_LOGS=true
 JOT_SENTRY_LEVEL=warning
 ```
 
-Each event gets a log level, from its fields:
-
-| Level | Events |
-|---|---|
-| `error` | an `error.type`, a status of 500 or more, a failed job |
-| `warning` | a 4xx status, a command or scheduled task with a non-zero exit code |
-| `notice` | slower than `sampling.slow_ms` |
-| `info` | every other event |
-
-`JOT_SENTRY_LEVEL` sets the lowest level that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off the logs, the tags and the "Jot" context.
+`JOT_SENTRY_LEVEL` sets the lowest [level](#levels) that goes to Sentry, `info` by default. Set it per environment, for example `warning` in production and `info` in staging. `JOT_SENTRY=false` turns off the logs, the tags and the "Jot" context.
 
 > Only sampled events reach Sentry, see [Sampling](#sampling).
 
