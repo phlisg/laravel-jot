@@ -59,11 +59,27 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 
 ## Installation
 
-```sh
-composer require marvelous-digital/laravel-wide-events
-```
+The package lives in a private GitHub repository and is not on Packagist, so Composer needs the repository and a token before `composer require` works:
 
-The repository is private: add it to the app's Composer `repositories` first, see [Install from another project](docs/development.md#install-from-another-project).
+1. Give Composer a GitHub token that can read `Marvelous-Digital/laravel-wide-events`:
+   ```sh
+   composer config github-oauth.github.com <token>
+   ```
+   `<token>` is a GitHub personal access token (PAT), for example a fine-grained token with read access to the repository's contents. Composer stores it in the app's `auth.json`, which Laravel's `.gitignore` already leaves out of git.
+2. Add the repository to the `repositories` list in the app's `composer.json`:
+   ```json
+   "repositories": [
+       { "type": "vcs", "url": "https://github.com/Marvelous-Digital/laravel-wide-events" }
+   ]
+   ```
+3. Install:
+   ```sh
+   composer require marvelous-digital/laravel-wide-events
+   ```
+
+> Add the repository to `composer.json` by hand. `composer config repositories.<name> ...` turns an existing `repositories` list into an object, which recent Composer versions reject.
+
+> CI and deploy servers need the token too, for example through the `COMPOSER_AUTH` environment variable: `{"github-oauth": {"github.com": "<token>"}}`.
 
 Nothing else is required. The package registers its helper, service provider, global middleware and event listeners itself, and its defaults apply until the app publishes `config/jot.php`.
 
