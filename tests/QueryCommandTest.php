@@ -193,7 +193,8 @@ it('filters on fields, with wildcards', function () {
 
     expect(listed(['--where' => ['user.id=7']]))->toBe(['bookings.store'])
         ->and(listed(['--where' => ['http.route=bookings.*']]))->toBe(['bookings.store', 'bookings.show'])
-        ->and(listed(['--where' => ['http.route=bookings.*', 'user.id=8']]))->toBe(['bookings.show']);
+        ->and(listed(['--where' => ['http.route=bookings.*', 'user.id=8']]))->toBe(['bookings.show'])
+        ->and(listed(['--where' => ['user.id=7,8']]))->toBe(['bookings.store', 'bookings.show']);
 });
 
 it('keeps only errors, or only slow events', function () {
