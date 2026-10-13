@@ -52,7 +52,7 @@ Laravel Wide Events applies the idea with one verb: code anywhere in the request
 - Tail sampling: keep every error and slow request, sample the rest.
 - Strict mode that warns on fields outside the schema.
 - Sentry and GlitchTip: issues tagged with the trace ID, events in Sentry Logs.
-- `jot:query` and `jot:tail`: read the events back from the log files, by trace, by filter or in an interactive table.
+- `jot:query`: reads the events back from the log files, by trace, by filter or in an interactive table.
 - Livewire and Filament: the components, calls and failed validations of each Livewire update.
 
 ## Installation
@@ -112,19 +112,73 @@ Without an import, the root alias works too: `\Jot::add(...)`. The pair mirrors 
 
 ### Reading events
 
-Three Artisan commands read the events back from the log files, so nobody has to find and search the files by hand:
+`jot:query` reads the events back from the log files, so nobody has to find and search the files by hand:
 
-- `jot:query`: one trace, or one event, by ID.
-- `jot:tail`: the most recent events, with filters.
-- `jot:tail -i`: the same events in a table to browse.
+- `jot:query`: the most recent events, with filters.
+- `jot:query <trace_id>`: one trace.
+- `jot:query <span_id>`: one event, with every field.
 
-They read only outputs on a `single` or `daily` channel, the ones that write files, plus the default Jot file. For any other output, such as `stderr` or Sentry Logs, they print where else to look.
+At a terminal it opens a list to browse. Piped, in CI (continuous integration), with `-n` or with `--json`, it prints plain lines.
+
+It reads only outputs on a `single` or `daily` channel, the ones that write files, plus the default Jot file. For any other output, such as `stderr` or Sentry Logs, it prints where else to look.
 
 For a live stream of all log messages, Jot events included, run `php artisan pail`.
 
+#### Recent events
+
+Without an ID, `jot:query` lists the most recent events, oldest first, one line per event: time, trace ID, then a summary of the event.
+
+```sh
+php artisan jot:query                                   # last 20 events from today's files
+php artisan jot:query --limit=50 --since=15m
+php artisan jot:query --errors                          # error.type set, 5xx status or failed job
+php artisan jot:query --slow                            # slower than jot.sampling.slow_ms
+php artisan jot:query --where=http.route=events.* --where=user.id=42
+php artisan jot:query --follow                          # keep printing new events, Ctrl+C to stop
+php artisan jot:query --json                            # one JSON line per event
+```
+
+```
+06:47:00  555ee94c04b56b2e7b91a58635e1a1f8  http  d7a93d989a9b145b  GET events.show 200  5ms
+06:47:00  7b096114f4407571aa14af9f01e5ef9d  http  13cbb92ae552c95a  POST events.details 200  0ms
+06:47:00  f682e78131053797dc9bb24718dd5ee7  http  f753e791229612e7  POST events.pay 200  1ms
+06:47:00  e3a6df5d662b366fad87a7969a4ff985  http  c6b2d9316c7f6888  POST stripe.webhook 204  1ms
+Run jot:query <trace_id> for a trace, or <span_id> for every field.
+```
+
+- `--where`: `key=value` on the flat field names, with `*` wildcards. Repeat it to combine filters.
+- `--since`: a number and a unit: `s`, `m`, `h` or `d`.
+- `--days=1`: how many days of files to read. `--since` reads further back when it needs to.
+- `--follow`: prints new events as they are written, as plain lines, also at a terminal.
+
+These filters apply to the recent events only. With an ID, `jot:query` refuses them.
+
+#### Browsing
+
+At a terminal, the recent events open in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the event:
+
+```sh
+php artisan jot:query --since=1h
+```
+
+```
+┌ Recent events ──────────────────────────────────────────────────────────┐
+│ / Search                                                                │
+├──────────┬───────┬───────────────────────┬────┬─────────────────────────┤
+│ Time     │ Type  │ What                  │ ms │ Error                   │
+├──────────┼───────┼───────────────────────┼────┼─────────────────────────┤
+│ 06:51:12 │ queue │ ChargeCard failed     │ 7  │ RuntimeException: Card… │
+│ 06:51:12 │ http  │ POST jobs.failing 200 │ 13 │                         │
+└──────────┴───────┴───────────────────────┴────┴─────────────────────────┘
+```
+
+- The newest event is at the top.
+- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the trace's events as a tree (see "One trace" below), and Enter on any of them prints its fields.
+- The table takes the same filters as the plain list.
+
 #### One trace
 
-`jot:query` finds the events of a trace and prints them as a tree, with `parent_span_id` showing which event started which:
+With a trace ID, `jot:query` finds the events of the trace and prints them as a tree, with `parent_span_id` showing which event started which:
 
 ```sh
 php artisan jot:query 4bf92f3577b34da6a3ce929d0e0e4736
@@ -141,57 +195,7 @@ http  f56220033574661e  POST checkout.store 200  412ms
 - `--days=7`: how many days of files to read.
 - `--json`: one JSON line per event.
 
-At a terminal, a trace ID opens the trace as a list laid out as the tree. Enter on an event prints every field, then go back to the trace or quit. With `--json`, `-n`, piped output or a single event, it prints the tree as above.
-
-#### Recent events
-
-`jot:tail` prints the most recent events, oldest first, one line per event: time, trace ID, then the same summary as `jot:query`.
-
-```sh
-php artisan jot:tail                                   # last 20 events from today's files
-php artisan jot:tail --limit=50 --since=15m
-php artisan jot:tail --errors                          # error.type set, 5xx status or failed job
-php artisan jot:tail --slow                            # slower than jot.sampling.slow_ms
-php artisan jot:tail --where=http.route=events.* --where=user.id=42
-php artisan jot:tail --follow                          # keep printing new events, Ctrl+C to stop
-php artisan jot:tail --json                            # one JSON line per event
-```
-
-```
-06:47:00  555ee94c04b56b2e7b91a58635e1a1f8  http  d7a93d989a9b145b  GET events.show 200  5ms
-06:47:00  7b096114f4407571aa14af9f01e5ef9d  http  13cbb92ae552c95a  POST events.details 200  0ms
-06:47:00  f682e78131053797dc9bb24718dd5ee7  http  f753e791229612e7  POST events.pay 200  1ms
-06:47:00  e3a6df5d662b366fad87a7969a4ff985  http  c6b2d9316c7f6888  POST stripe.webhook 204  1ms
-Run jot:query <trace_id> for a trace, or <span_id> for every field.
-```
-
-- `--where`: `key=value` on the flat field names, with `*` wildcards. Repeat it to combine filters.
-- `--since`: a number and a unit: `s`, `m`, `h` or `d`.
-- `--days=1`: how many days of files to read. `--since` reads further back when it needs to.
-
-#### Browsing
-
-Add `-i` to browse the events in a table. Arrow keys move, `/` searches (trace and span IDs match too), `r` reloads the events, and Enter prints every field of the event:
-
-```sh
-php artisan jot:tail -i --since=1h
-```
-
-```
-┌ Recent events ──────────────────────────────────────────────────────────┐
-│ / Search                                                                │
-├──────────┬───────┬───────────────────────┬────┬─────────────────────────┤
-│ Time     │ Type  │ What                  │ ms │ Error                   │
-├──────────┼───────┼───────────────────────┼────┼─────────────────────────┤
-│ 06:51:12 │ queue │ ChargeCard failed     │ 7  │ RuntimeException: Card… │
-│ 06:51:12 │ http  │ POST jobs.failing 200 │ 13 │                         │
-└──────────┴───────┴───────────────────────┴────┴─────────────────────────┘
-```
-
-- The newest event is at the top.
-- After the fields, pick Back to the list, Show the trace or Quit. Show the trace lists the trace's events as the `jot:query` tree, and Enter on any of them prints its fields.
-- The table takes the same filters as the plain list. It can't run together with `--follow` or `--json`.
-- Without a terminal, for example in CI or with `-n`, it prints the plain list.
+At a terminal, a trace ID opens the trace as a list laid out as the tree. Enter on an event prints every field, then pick Back to the trace or Quit. A span ID, or a trace with a single event, prints the tree as above.
 
 ## Configuration
 
