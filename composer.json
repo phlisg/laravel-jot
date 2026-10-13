@@ -62,7 +62,8 @@
         "analyse": "vendor/bin/phpstan analyse --memory-limit=2G",
         "test": "vendor/bin/pest",
         "test-coverage": "vendor/bin/pest --coverage",
-        "format": "vendor/bin/pint"
+        "format": "vendor/bin/pint",
+        "docs:tapes": "for t in docs/tapes/*.tape; do vhs \"$t\"; done"
     },
     "config": {
         "sort-packages": true,

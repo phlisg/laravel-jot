@@ -108,6 +108,10 @@ tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).
 
 `jot:demo` prints the path at the end of each run.
 
+### Terminal recordings
+
+`composer docs:tapes` renders the README GIFs in `docs/images` from the [VHS](https://github.com/charmbracelet/vhs) tapes in `docs/tapes`. Run it on the host, not through `./dev`: it needs `vhs` and PHP with `pdo_sqlite`, and it replaces the events in the workbench log.
+
 ### New scenario
 
 1. Add the route to `workbench/routes/web.php`, with a name, since `http.route` holds the route name.
