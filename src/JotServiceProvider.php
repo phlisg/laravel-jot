@@ -18,7 +18,7 @@ class JotServiceProvider extends PackageServiceProvider
         $package
             ->name('jot')
             ->hasConfigFile()
-            ->hasCommands(Commands\SectionCommand::class, Commands\EnvCommand::class, Commands\QueryCommand::class)
+            ->hasCommands(Commands\SectionCommand::class, Commands\EnvCommand::class, Commands\QueryCommand::class, Commands\DiskCommand::class)
             ->hasInstallCommand(fn (InstallCommand $command) => $command
                 ->publishConfigFile()
                 ->endWith(fn (InstallCommand $command) => $command->call('jot:env')));

@@ -119,6 +119,8 @@ An event took about 950 bytes, measured in one app. Jot writes one event per req
 - 7 days: the default of `days`. Scale to your setting.
 - Environments: multiply by the number of environments on the server. Staging, preproduction and production on one server write three sets of files.
 
+To check a server, run `php artisan jot:disk`. It prints the sampling settings and, for each output that writes files, their size, the growth a day, the size at the end of the retention, the free disk space and the days until the disk is full. Run it on each server: it reads only the local files.
+
 ## Requirements
 
 - PHP 8.3 or later
