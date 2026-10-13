@@ -119,6 +119,21 @@ tail -f vendor/orchestra/testbench-core/laravel/storage/logs/jot-$(date -u +%F).
 3. Add a `run<Name>()` method that calls `$this->send()` once per request, for example `runJobSync()` for `job-sync`.
 4. Run `./dev php vendor/bin/testbench jot:demo <name>` to check the events.
 
+## Documentation
+
+The README is for app developers who have never read it: what Jot is and costs, install, debug an incident, add fields, volume, Sentry. Reference material lives in `docs/`: fields, querying, configuration, Livewire, outputs, examples. `architecture.md` holds the mechanism only, the README the user-facing fact.
+
+When editing:
+
+- One home per fact. The list of always-kept events lives in "Sampling" in the README, other places link to it.
+- `docs/configuration.md` holds `config/jot.php` verbatim, minus `<?php`. Update both together.
+- Comments in `src/` and `config/jot.php` point to headings by name ("Sampling", "Levels and volume", "Key collisions", "Flattening rules"). Renaming a heading means `grep -rn "README\|docs/" src config`.
+- The README Contents lists every H2 and H3. Check anchors after renaming one.
+- State behaviour only after checking it in `src/`, and numbers only when measured. The disk table uses about 950 bytes per event, measured in one app.
+- An upgrade step goes to the CHANGELOG entry of the release and to "Upgrading" in the README.
+
+To review a large change, ask readers who never saw the docs: a junior installing Jot, a lead evaluating it, an on-call developer debugging an error, an editor checking the prose.
+
 ## Where a check belongs
 
 | The behavior | Where |
