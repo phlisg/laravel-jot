@@ -134,11 +134,12 @@ class DemoCommand extends Command
      */
     protected function livewire(string $snapshot, string $method, array $updates = []): string
     {
-        $response = $this->send('POST', '/livewire/update', ['components' => [[
+        // Livewire 4 accepts only JSON, on a URI that differs per app.
+        $response = $this->send('POST', app('livewire')->getUpdateUri(), headers: ['X-Livewire' => 'true', 'Content-Type' => 'application/json'], content: json_encode(['components' => [[
             'snapshot' => $snapshot,
             'updates' => $updates,
             'calls' => [['path' => '', 'method' => $method, 'params' => []]],
-        ]]], ['X-Livewire' => 'true']);
+        ]]]));
 
         return json_decode($response->getContent(), true)['components'][0]['snapshot'];
     }
@@ -146,7 +147,7 @@ class DemoCommand extends Command
     /**
      * One request through the HTTP kernel, with the state a new PHP process would start with.
      */
-    protected function send(string $method, string $uri, array $data = [], array $headers = []): Response
+    protected function send(string $method, string $uri, array $data = [], array $headers = [], ?string $content = null): Response
     {
         $this->laravel->forgetInstance(Jot::class);
         Context::flush();
@@ -154,7 +155,7 @@ class DemoCommand extends Command
         session()->flush();
 
         $kernel = $this->laravel->make(Kernel::class);
-        $request = Request::create($uri, $method, $data, $this->cookies);
+        $request = Request::create($uri, $method, $data, $this->cookies, content: $content);
         $request->headers->add($headers);
         $response = $kernel->handle($request);
         $kernel->terminate($request, $response);
