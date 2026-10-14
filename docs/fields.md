@@ -390,7 +390,7 @@ When Laravel reports an exception, Jot adds:
 | Field | Value |
 |---|---|
 | `error.type` | exception class |
-| `exception.message` | exception message |
+| `exception.message` | exception message, cut to 2000 characters |
 | `error.code` | exception code |
 | `error.retriable` | `true` when the exception implements `MarvelousDigital\WideEvents\Contracts\Retriable` |
 | `error.count` | how many exceptions were reported during the event |

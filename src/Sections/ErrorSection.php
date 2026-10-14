@@ -2,6 +2,7 @@
 
 namespace MarvelousDigital\WideEvents\Sections;
 
+use Illuminate\Support\Str;
 use MarvelousDigital\WideEvents\Attributes\Hide;
 use MarvelousDigital\WideEvents\Attributes\Key;
 use MarvelousDigital\WideEvents\Contracts\Retriable;
@@ -33,7 +34,8 @@ final class ErrorSection extends Section
         $this->exception = $e;
         $this->count = $count;
         $this->type = $e::class;
-        $this->message = $e->getMessage();
+        // A query exception lists every binding, which can reach several MB.
+        $this->message = Str::limit($e->getMessage(), 2000);
         $this->code = $e->getCode();
         $this->retriable = $e instanceof Retriable;
     }

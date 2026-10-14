@@ -143,6 +143,18 @@ describe('http', function () {
         expect(emittedBy('http'))->toMatchArray(['error.type' => RuntimeException::class, 'exception.message' => 'CRM down', 'error.count' => 1]);
     });
 
+    it('cuts a long exception message to 2000 characters', function () {
+        Route::get('/sync', function () {
+            report(new RuntimeException(str_repeat('a', 5000)));
+
+            return 'ok';
+        });
+
+        $this->get('/sync')->assertOk();
+
+        expect(emittedBy('http')['exception.message'])->toBe(str_repeat('a', 2000).'...');
+    });
+
     it('keeps the last reported exception, and counts them', function () {
         Route::get('/sync', function () {
             report(new RuntimeException('CRM down'));
