@@ -175,7 +175,7 @@ return [
         'max_per_minute' => env('JOT_MAX_PER_MINUTE', 10),
         // Livewire updates that only poll or refresh a component.
         'drop_livewire_polls' => true,
-        // Events never written unless always kept. Same patterns as jot:query --where: * wildcards, commas for OR.
+        // Events never written unless always kept. Same patterns as jot:query --where: * wildcards, commas for OR, 40.. for a range.
         'drop' => [
             ['http.route' => 'boost.*,debugbar.*,telescope*,horizon.*'],
         ],

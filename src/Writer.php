@@ -144,7 +144,8 @@ class Writer
     }
 
     /**
-     * Every key matches its pattern: * wildcards, commas for OR. The syntax of jot:query --where.
+     * Every key matches its pattern: * wildcards, commas for OR, 40..100 for an inclusive number range.
+     * The syntax of jot:query --where.
      *
      * @param  array<string, mixed>  $where
      */
@@ -154,8 +155,18 @@ class Writer
 
         foreach ($where as $key => $pattern) {
             $value = $event[$key] ?? null;
+            $alternatives = explode(',', $text($pattern));
+            $ranges = preg_grep('/^(?=.*\d)(-?\d+(\.\d+)?)?\.\.(-?\d+(\.\d+)?)?$/', $alternatives) ?: [];
 
-            if ($value === null || ! Str::is(explode(',', $text($pattern)), $text($value))) {
+            $inRange = function (string $range) use ($value) {
+                [$min, $max] = explode('..', $range);
+
+                return is_numeric($value)
+                    && ($min === '' || (float) $value >= (float) $min)
+                    && ($max === '' || (float) $value <= (float) $max);
+            };
+
+            if ($value === null || ! Str::is(array_diff($alternatives, $ranges), $text($value)) && ! array_filter($ranges, $inRange)) {
                 return false;
             }
         }

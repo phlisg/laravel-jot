@@ -429,6 +429,7 @@ Patterns use the syntax of `jot:query --where`:
 
 - Each key must match.
 - `*` is a wildcard. Commas list alternatives: `'boost.*,horizon.*'`.
+- Two dots give a number range, bounds included: `'40..'`, `'..100'`, `'500..599'`. See [Filter](docs/querying.md#filter).
 - A missing field never matches. An empty pattern list, `[]`, matches no event.
 - A value other than a string is compared as JSON: `true`, `419`, `["a::b"]`.
 
@@ -437,7 +438,7 @@ Find the noise first, then drop it with the same pattern:
 1. Run `php artisan jot:query --where=http.route=boost.*` and check that it lists only the noise.
 2. Add `['http.route' => 'boost.*']` to `sampling.drop` in `config/jot.php`.
 
-`keepWhen` and `dropWhen` take the same patterns, or a closure for what a pattern cannot express, such as a number comparison. Register them in a service provider. Closures stay out of `config/jot.php`, because `php artisan config:cache` cannot serialize them.
+`keepWhen` and `dropWhen` take the same patterns, or a closure for what a pattern cannot express, such as a comparison between two fields. Register them in a service provider. Closures stay out of `config/jot.php`, because `php artisan config:cache` cannot serialize them.
 
 ```php
 <?php

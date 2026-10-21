@@ -82,6 +82,7 @@ php artisan jot:query --slow                                       # slower than
 php artisan jot:query --since=15m --limit=50
 php artisan jot:query --where='http.route=events.*' --where=user.id=42
 php artisan jot:query --where=entrypoint=queue,schedule             # jobs and scheduled tasks
+php artisan jot:query --where=db.query_count=40..                  # 40 queries or more
 ```
 
 With `--errors`:
@@ -95,6 +96,17 @@ Run jot:query <trace_id> for a trace, or <span_id> for every field.
 
 - `*` is a wildcard: `--where='http.route=events.*'`.
 - Commas list alternatives: `--where=entrypoint=http,queue`.
+- Two dots give a number range, bounds included:
+
+  | Pattern | Matches |
+  |---|---|
+  | `--where=db.query_count=40..` | 40 or more |
+  | `--where=duration_ms=..100` | 100 or less |
+  | `--where=http.response.status_code=500..599` | 500 to 599 |
+  | `--where=db.time_ms=0.5..` | 0.5 or more, decimals allowed |
+  | `--where=db.query_count=40..,0` | 40 or more, or exactly 0 |
+
+  A range matches only a number. Jot uses `..` because the shell reads `>` and `<` as redirection: `--where=x>40` writes a file named `40`.
 - A list field, such as `livewire.calls`, is compared as JSON, so wrap the pattern in `*`: `--where='livewire.calls=*::submit*'`.
 - An event without the field never matches.
 

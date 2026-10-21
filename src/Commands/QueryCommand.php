@@ -21,7 +21,7 @@ class QueryCommand extends Command
     protected $signature = 'jot:query
         {id? : A trace ID (32 hex characters) or a span ID (16). Without it, the recent events}
         {--limit=20 : How many recent events to list}
-        {--where=* : Field filter, key=value, repeatable; the value may use * wildcards}
+        {--where=* : Field filter, key=value, repeatable; the value may use * wildcards, commas for OR, 40..100 for a number range}
         {--errors : Only events with an error.type, a 5xx status or a failed job}
         {--slow : Only events slower than jot.sampling.slow_ms}
         {--since= : Only events newer than this, for example 15m, 2h or 1d}

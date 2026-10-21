@@ -210,6 +210,18 @@ it('filters on fields, with wildcards', function () {
         ->and(listed(['--where' => ['user.id=7,8']]))->toBe(['bookings.store', 'bookings.show']);
 });
 
+it('filters on a number range', function () {
+    logged('few', ['db.query_count' => 3]);
+    logged('many', ['db.query_count' => 40]);
+    logged('none', ['db.query_count' => 0]);
+    logged('home');
+
+    expect(listed(['--where' => ['db.query_count=40..']]))->toBe(['many'])
+        ->and(listed(['--where' => ['db.query_count=..3']]))->toBe(['few', 'none'])
+        ->and(listed(['--where' => ['db.query_count=1..40']]))->toBe(['few', 'many'])
+        ->and(listed(['--where' => ['db.query_count=40..,0']]))->toBe(['many', 'none']);
+});
+
 it('keeps only errors, or only slow events', function () {
     logged('ok');
     logged('server', ['http.response.status_code' => 503]);

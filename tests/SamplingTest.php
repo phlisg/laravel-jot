@@ -253,3 +253,32 @@ it('compares a value that is not a string as JSON, and never matches a missing f
         ->and(Writer::matches(['livewire.calls' => ['checkout::checkStatus']], ['livewire.calls' => '*::checkStatus*']))->toBeTrue()
         ->and(Writer::matches([], ['user.id' => '*']))->toBeFalse();
 });
+
+it('matches a number range with ..', function () {
+    expect(Writer::matches(['db.query_count' => 40], ['db.query_count' => '40..']))->toBeTrue()
+        ->and(Writer::matches(['db.query_count' => 39], ['db.query_count' => '40..']))->toBeFalse()
+        ->and(Writer::matches(['duration_ms' => 100], ['duration_ms' => '..100']))->toBeTrue()
+        ->and(Writer::matches(['duration_ms' => 101], ['duration_ms' => '..100']))->toBeFalse()
+        ->and(Writer::matches(['http.response.status_code' => 599], ['http.response.status_code' => '500..599']))->toBeTrue()
+        ->and(Writer::matches(['http.response.status_code' => 600], ['http.response.status_code' => '500..599']))->toBeFalse()
+        ->and(Writer::matches(['db.time_ms' => 0.75], ['db.time_ms' => '0.5..']))->toBeTrue()
+        ->and(Writer::matches(['db.time_ms' => 0.25], ['db.time_ms' => '0.5..']))->toBeFalse()
+        ->and(Writer::matches(['offset' => -3], ['offset' => '-5..-1']))->toBeTrue()
+        ->and(Writer::matches(['user.id' => '42'], ['user.id' => '40..50']))->toBeTrue();
+});
+
+it('never matches a range against a missing or non-numeric value', function () {
+    expect(Writer::matches([], ['db.query_count' => '40..']))->toBeFalse()
+        ->and(Writer::matches(['http.route' => 'home'], ['http.route' => '..100']))->toBeFalse()
+        ->and(Writer::matches(['error.retriable' => true], ['error.retriable' => '0..']))->toBeFalse()
+        ->and(Writer::matches(['livewire.calls' => [50]], ['livewire.calls' => '40..']))->toBeFalse();
+});
+
+it('mixes ranges and literals with commas, and matches a value with .. literally', function () {
+    expect(Writer::matches(['db.query_count' => 0], ['db.query_count' => '40..,0']))->toBeTrue()
+        ->and(Writer::matches(['db.query_count' => 45], ['db.query_count' => '40..,0']))->toBeTrue()
+        ->and(Writer::matches(['db.query_count' => 5], ['db.query_count' => '40..,0']))->toBeFalse()
+        ->and(Writer::matches(['url.path' => '/a..b'], ['url.path' => '/a..b']))->toBeTrue()
+        ->and(Writer::matches(['url.path' => '..'], ['url.path' => '..']))->toBeTrue()
+        ->and(Writer::matches(['url.path' => '/a/1..2'], ['url.path' => '*1..2']))->toBeTrue();
+});
