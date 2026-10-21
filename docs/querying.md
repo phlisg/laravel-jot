@@ -133,20 +133,22 @@ php artisan jot:query --since=1h
 ![Browsing recent events with jot:query: search, every field of a request, then its trace and the failed job](images/browse.gif)
 
 ```
-┌ Recent events ──────────────────────────────────────────────────────────┐
-│ / Search                                                                │
-├──────────┬───────┬───────────────────────┬────┬─────────────────────────┤
-│ Time     │ Type  │ What                  │ ms │ Error                   │
-├──────────┼───────┼───────────────────────┼────┼─────────────────────────┤
-│ 06:51:12 │ queue │ ChargeCard failed     │ 7  │ RuntimeException: Card… │
-│ 06:51:12 │ http  │ POST jobs.failing 200 │ 13 │                         │
-└──────────┴───────┴───────────────────────┴────┴─────────────────────────┘
+┌ Recent events ────────────────────────────────────────────────────────────────────┐
+│ / Search                                                                          │
+├──────────┬──────────┬────────┬───────────────────┬────┬───────────────────────────┤
+│ Time     │ Session  │ Status │ What              │ ms │ Error                     │
+├──────────┼──────────┼────────┼───────────────────┼────┼───────────────────────────┤
+│ 06:51:12 │          │ failed │ ChargeCard        │ 7  │ RuntimeException: Card…   │
+│ 06:51:12 │ aeda857e │ 200    │ POST jobs.failing │ 13 │                           │
+└──────────┴──────────┴────────┴───────────────────┴────┴───────────────────────────┘
 ```
+
+Status holds the response code, the job status or `exit N`. A row is red for an `error.type`, a 5xx status or a failed job, and yellow for a 4xx status or a non-zero exit code. Session holds the first 8 characters of `session.hash`. The table hides Session when all events share one session or have none, and Error when no event failed. The title lists the `--where` filters.
 
 | Key | Does |
 |---|---|
 | Arrow keys | move |
-| `/` | search the rows, trace and span IDs included |
+| `/` | search the rows, trace and span IDs and `session.hash` included. `key=value` filters on any field, as `--where` does |
 | `r` | reload the events |
 | Enter | print every field of the event |
 

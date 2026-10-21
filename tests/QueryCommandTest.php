@@ -11,6 +11,8 @@ use Laravel\Prompts\Key;
 use Laravel\Prompts\Prompt;
 use LogicException;
 use MarvelousDigital\WideEvents\Commands\QueryCommand;
+use MarvelousDigital\WideEvents\Commands\Table\EventTable;
+use MarvelousDigital\WideEvents\Commands\Table\EventTableRenderer;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
 use MarvelousDigital\WideEvents\Writer;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -437,5 +439,108 @@ it('reloads the events with r, the cursor kept on its span', function () {
         ->expectsOutputToContain('newest')
         ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
         ->doesntExpectOutputToContain('cccccccccccccccc')
+        ->assertSuccessful();
+});
+
+function columns(array $events): array
+{
+    return (fn () => $this->columns($events))->call(app(QueryCommand::class));
+}
+
+it('shows the status apart from what ran, and the session cut to 8 characters', function () {
+    $columns = columns([
+        ['entrypoint' => 'http', 'http.request.method' => 'GET', 'http.route' => 'profiles.lists', 'http.response.status_code' => 200, 'session.hash' => 'aeda857e0123456789', 'duration_ms' => 5],
+        ['entrypoint' => 'queue', 'job.name' => 'App\\Jobs\\ChargeCard', 'job.status' => 'failed', 'error.type' => 'RuntimeException', 'exception.message' => 'Boom'],
+        ['entrypoint' => 'schedule', 'schedule.task' => 'schedule:run', 'schedule.exit_code' => 1],
+    ]);
+
+    expect(array_keys($columns))->toBe(['Time', 'Session', 'Status', 'What', 'ms', 'Error'])
+        ->and($columns['Session'])->toBe(['aeda857e', '', ''])
+        ->and($columns['Status'])->toBe(['200', 'failed', 'exit 1'])
+        ->and($columns['What'])->toBe(['GET profiles.lists', 'ChargeCard', 'schedule:run'])
+        ->and($columns['Error'])->toBe(['', 'RuntimeException: Boom', '']);
+});
+
+it('hides the session and error columns when they tell nothing', function () {
+    $columns = columns([
+        ['entrypoint' => 'http', 'session.hash' => 'aeda857e0123456789'],
+        ['entrypoint' => 'http', 'session.hash' => 'aeda857e0123456789'],
+    ]);
+
+    expect(array_keys($columns))->toBe(['Time', 'Status', 'What', 'ms']);
+});
+
+it('pads the headers so a narrow terminal shrinks the error first', function () {
+    $command = app(QueryCommand::class);
+    $columns = ['Time' => ['14:02:11'], 'Status' => ['failed'], 'What' => ['POST jobs.failing', str_repeat('x', 50)], 'ms' => ['36'], 'Error' => ['RuntimeException: Boom']];
+
+    expect((fn () => $this->headers($columns))->call($command))
+        ->toBe(['Time    ', 'Status', str_pad('What', 32), 'ms', 'Error']);
+});
+
+it('colors a row by the level of its event', function (array $event, ?string $color) {
+    expect(EventTable::color($event))->toBe($color);
+})->with([
+    '5xx' => [['entrypoint' => 'http', 'http.response.status_code' => 503], 'red'],
+    'failed job' => [['entrypoint' => 'queue', 'job.status' => 'failed'], 'red'],
+    'error' => [['entrypoint' => 'http', 'http.response.status_code' => 200, 'error.type' => 'RuntimeException'], 'red'],
+    '4xx' => [['entrypoint' => 'http', 'http.response.status_code' => 404], 'yellow'],
+    'exit code' => [['entrypoint' => 'console', 'console.exit_code' => 1], 'yellow'],
+    '2xx' => [['entrypoint' => 'http', 'http.response.status_code' => 200], null],
+]);
+
+it('keeps the colored rows aligned, and the highlighted row plain', function () {
+    Prompt::fake();
+    $table = new EventTable(['Status', 'Error'], [['200', ''], ['500', 'RuntimeException: '.str_repeat('x', 200)], ['404', 'Not found']], scroll: 3);
+    $table->colors = [0 => 'red', 1 => 'red', 2 => 'yellow'];
+
+    $lines = explode(PHP_EOL, (new EventTableRenderer($table))($table));
+    $rows = array_values(array_filter($lines, fn ($line) => preg_match('/│ (200|500|404) /', preg_replace("/\e\[[0-9;]*m/", '', $line))));
+    $plain = array_map(fn ($line) => preg_replace("/\e\[[0-9;]*m/", '', $line), $rows);
+
+    expect($rows)->toHaveCount(3)
+        ->and($rows[0])->not->toContain("\e[31m")
+        ->and($rows[1])->toContain("\e[31m")
+        ->and($rows[2])->toContain("\e[33m")
+        ->and(array_unique(array_map(mb_strwidth(...), $plain)))->toHaveCount(1);
+});
+
+it('names the --where filters in the table label', function () {
+    atTerminal();
+    logged('home', ['session.hash' => 'aeda857e0123456789abcdef']);
+
+    Prompt::fake([Key::ENTER]);
+
+    $this->artisan('jot:query', ['--where' => ['session.hash=aeda857e*', 'http.route=home']])
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('Recent events · session.hash=aeda857e* · http.route=home')
+        ->assertSuccessful();
+});
+
+it('searches the table by key=value on every field, with wildcards', function () {
+    atTerminal();
+    logged('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'user.id' => 7, 'timestamp' => now()->subMinute()->toIso8601String()]);
+    logged('newer', ['span_id' => 'bbbbbbbbbbbbbbbb', 'user.id' => 8]);
+
+    Prompt::fake(['/', ...str_split('user.id=7,9'), Key::ENTER, Key::ENTER]);
+
+    $this->artisan('jot:query')
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->doesntExpectOutputToContain('bbbbbbbbbbbbbbbb')
+        ->assertSuccessful();
+});
+
+it('searches the table by session hash', function () {
+    atTerminal();
+    logged('older', ['span_id' => 'aaaaaaaaaaaaaaaa', 'session.hash' => 'ffff0000eeee1111', 'timestamp' => now()->subMinute()->toIso8601String()]);
+    logged('newer', ['span_id' => 'bbbbbbbbbbbbbbbb', 'session.hash' => 'ffff0000dddd2222']);
+
+    Prompt::fake(['/', ...str_split('eee1'), Key::ENTER, Key::ENTER]);
+
+    $this->artisan('jot:query')
+        ->expectsChoice('Next', 'quit', ['list' => 'Back to the list', 'trace' => 'Show the trace', 'quit' => 'Quit'])
+        ->expectsOutputToContain('aaaaaaaaaaaaaaaa')
+        ->doesntExpectOutputToContain('bbbbbbbbbbbbbbbb')
         ->assertSuccessful();
 });

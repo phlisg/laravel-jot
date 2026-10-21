@@ -6,9 +6,9 @@ use Closure;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
-use Laravel\Prompts\DataTablePrompt;
 use Laravel\Prompts\Key;
 use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
+use MarvelousDigital\WideEvents\Commands\Table\EventTable;
 use MarvelousDigital\WideEvents\Writer;
 use Psr\Log\LogLevel;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -254,29 +254,30 @@ class QueryCommand extends Command
      */
     protected function promptTable(array $events, ?string $cursor): array
     {
-        $rows = array_map(fn ($event) => [
-            $this->time($event),
-            (string) ($event['entrypoint'] ?? '?'),
-            $this->describe($event),
-            (string) ($event['duration_ms'] ?? ''),
-            Str::limit((string) $this->errorMessage($event), 60),
-        ], $events);
+        $columns = $this->columns($events);
+        $rows = array_map(null, ...array_values($columns));
 
-        // The filter gets the row without its key, so the IDs are looked up by the row's text; identical rows share them.
-        $ids = [];
+        // The filter gets the row without its key, so the events are looked up by the row's text; identical rows share them.
+        $matching = [];
         foreach ($rows as $i => $row) {
-            $key = implode("\0", $row);
-            $ids[$key] = ($ids[$key] ?? '').' '.($events[$i]['trace_id'] ?? '').' '.$events[$i]['span_id'];
+            $matching[implode("\0", $row)][] = $events[$i];
         }
 
-        $table = new DataTablePrompt(
-            ['Time', 'Type', 'What', 'ms', 'Error'],
+        $where = array_map(function ($filter) {
+            [$key, $value] = explode('=', (string) $filter, 2);
+
+            return $key.'='.Str::limit($value, 16, '…');
+        }, (array) $this->option('where'));
+
+        $table = new EventTable(
+            $this->headers($columns),
             $rows,
             scroll: min(10, count($rows)),
-            label: 'Recent events',
-            hint: '/ search · r refresh · Enter shows every field',
-            filter: fn (array $row, string $query) => str_contains(mb_strtolower(implode(' ', $row).$ids[implode("\0", $row)]), mb_strtolower($query)),
+            label: implode(' · ', ['Recent events', ...$where]),
+            hint: '/ search, or key=value · r refresh · Enter shows every field',
+            filter: fn (array $row, string $query) => $this->searched($matching[implode("\0", $row)], $row, $query),
         );
+        $table->colors = array_filter(array_map(EventTable::color(...), $events));
 
         // Arrow presses through the public event API: Prompts keeps highlight() protected.
         $down = array_search($cursor, array_column($events, 'span_id'), true);
@@ -293,6 +294,73 @@ class QueryCommand extends Command
         });
 
         return [(int) $table->prompt(), $refresh];
+    }
+
+    /**
+     * The table's cells by header, without the Session column when one session made every event, or Error when none failed.
+     *
+     * @param  list<array<string, mixed>>  $events
+     * @return array<string, list<string>>
+     */
+    protected function columns(array $events): array
+    {
+        $columns = [
+            'Time' => array_map($this->time(...), $events),
+            'Session' => array_map(fn ($event) => substr((string) ($event['session.hash'] ?? ''), 0, 8), $events),
+            'Status' => array_map($this->status(...), $events),
+            'What' => array_map($this->what(...), $events),
+            'ms' => array_map(fn ($event) => (string) ($event['duration_ms'] ?? ''), $events),
+            'Error' => array_map(fn ($event) => Str::limit((string) $this->errorMessage($event), 60), $events),
+        ];
+
+        if (count(array_unique($columns['Session'])) < 2) {
+            unset($columns['Session']);
+        }
+
+        if (array_filter($columns['Error']) === []) {
+            unset($columns['Error']);
+        }
+
+        return $columns;
+    }
+
+    /**
+     * The headers, padded to the widest cell (What to 32 at most, Error not at all), so a narrow terminal shrinks Error first.
+     * Prompts shrinks every column in proportion and keeps the header's width as the only floor.
+     *
+     * @param  array<string, list<string>>  $columns
+     * @return list<string>
+     */
+    protected function headers(array $columns): array
+    {
+        return array_map(
+            fn ($header, $cells) => $header === 'Error'
+                ? $header
+                : str_pad($header, min($header === 'What' ? 32 : PHP_INT_MAX, max(array_map(mb_strwidth(...), [$header, ...$cells])))),
+            array_keys($columns),
+            $columns,
+        );
+    }
+
+    /**
+     * Whether a search matches the row: key=value as --where on any of the row's events, or else text in the row or their IDs.
+     *
+     * @param  list<array<string, mixed>>  $events
+     * @param  array<int, string>  $row
+     */
+    protected function searched(array $events, array $row, string $query): bool
+    {
+        if (str_contains($query, '=')) {
+            [$key, $value] = explode('=', $query, 2);
+
+            return collect($events)->contains(fn ($event) => Writer::matches($event, [$key => $value]));
+        }
+
+        $text = implode(' ', $row).' '.collect($events)
+            ->flatMap(fn ($event) => [$event['trace_id'] ?? '', $event['span_id'], $event['session.hash'] ?? ''])
+            ->implode(' ');
+
+        return str_contains(mb_strtolower($text), mb_strtolower($query));
     }
 
     /**

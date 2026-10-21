@@ -158,15 +158,42 @@ trait ReadsEvents
      */
     protected function describe(array $event): string
     {
+        return implode(' ', array_filter([$this->what($event), $this->status($event)], fn ($part) => $part !== ''));
+    }
+
+    /**
+     * The method and route of a request, the job, or the command.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function what(array $event): string
+    {
         $what = match ($event['entrypoint'] ?? null) {
-            'http' => [$event['http.request.method'] ?? null, $event['http.route'] ?? $event['url.path'] ?? null, $event['http.response.status_code'] ?? null],
-            'queue' => [class_basename((string) ($event['job.name'] ?? '')), $event['job.status'] ?? null],
-            'console' => [$event['console.command'] ?? null, isset($event['console.exit_code']) ? "exit {$event['console.exit_code']}" : null],
-            'schedule' => [$event['schedule.task'] ?? null, isset($event['schedule.exit_code']) ? "exit {$event['schedule.exit_code']}" : null],
+            'http' => [$event['http.request.method'] ?? null, $event['http.route'] ?? $event['url.path'] ?? null],
+            'queue' => [class_basename((string) ($event['job.name'] ?? ''))],
+            'console' => [$event['console.command'] ?? null],
+            'schedule' => [$event['schedule.task'] ?? null],
             default => [],
         };
 
         return implode(' ', array_filter($what, fn ($part) => $part !== null && $part !== ''));
+    }
+
+    /**
+     * The status code of a request, the status of a job, or the exit code of a command.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function status(array $event): string
+    {
+        $entrypoint = $event['entrypoint'] ?? null;
+
+        return match ($entrypoint) {
+            'http' => (string) ($event['http.response.status_code'] ?? ''),
+            'queue' => (string) ($event['job.status'] ?? ''),
+            'console', 'schedule' => isset($event["{$entrypoint}.exit_code"]) ? "exit {$event["{$entrypoint}.exit_code"]}" : '',
+            default => '',
+        };
     }
 
     /**
