@@ -4,6 +4,7 @@ namespace MarvelousDigital\WideEvents\Tests;
 
 use Illuminate\Support\Facades\Route;
 use MarvelousDigital\WideEvents\Enums\OutputShape;
+use MarvelousDigital\WideEvents\Facades\Jot;
 use MarvelousDigital\WideEvents\Writer;
 use Sentry\ClientBuilder;
 use Sentry\Event;
@@ -128,6 +129,26 @@ it('tags Sentry issues with the trace and span IDs', function () {
     expect($transport->events[0]->getTags())
         ->toMatchArray(['trace_id' => $response->headers->get('X-Request-Id')])
         ->span_id->toMatch('/^[0-9a-f]{16}$/');
+});
+
+it('tags Sentry issues with the session hash that Jot writes', function () {
+    Jot::fake();
+    $transport = sentry();
+    Route::middleware('web')->get('/', fn () => \Sentry\captureMessage('boom') && 'ok');
+
+    $this->get('/');
+
+    expect(app(Writer::class)->faked[0]['session.hash'])->toMatch('/^[0-9a-f]{16}$/')
+        ->toBe($transport->events[0]->getTags()['session.hash'] ?? null);
+});
+
+it('adds no session tag to Sentry issues without a session', function () {
+    $transport = sentry();
+    Route::get('/', fn () => \Sentry\captureMessage('boom') && 'ok');
+
+    $this->get('/');
+
+    expect($transport->events[0]->getTags())->not->toHaveKey('session.hash');
 });
 
 it('shows on each Sentry issue how to find its wide event', function () {

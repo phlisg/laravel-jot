@@ -204,6 +204,7 @@ Each collision logs a warning on the default log channel, see [Key collisions](.
 - Levels: `Writer::level()` gives each event a log level from its fields. An output with a `level` key skips events below it.
 - Sentry channel: when the Sentry SDK is installed with logs on, `Writer::outputs()` adds the SDK's `sentry_logs` channel, unless the app lists it already.
 - Sentry tags: `Jot::tagSentry()` tags the Sentry scope with `trace_id` and `span_id`, and adds a "Jot" context with the `jot:query` command and the optional `jot.sentry.link`.
+- Session tag: the session starts after Jot's global middleware, so `JotServiceProvider` adds one global Sentry event processor that tags `session.hash` at capture time, with `UserSection::hash()`. No session, no tag.
 - Re-tagging: `tagSentry()` runs at each start, and again when the stack restores the previous event, so an issue never carries the IDs of a sync job that already ended.
 
 An output with channel `null` writes to a daily file, `storage/logs/jot-YYYY-MM-DD.log`, kept `jot.days` days, with Monolog's `JsonFormatter`. Laravel's channels append Context to each line, which would repeat the IDs, so Jot builds this Monolog logger by hand and wraps it in Laravel's `Illuminate\Log\Logger`. The wrapper still fires `MessageLogged`, so `php artisan pail` shows the events.

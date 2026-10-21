@@ -30,13 +30,20 @@ final class UserSection extends Section
             $this->id = $request->user()?->getAuthIdentifier();
         }
 
-        // Never the raw ID: whoever reads the logs could take over the session.
         if (config('jot.fields.session', true) && $request->hasSession()) {
-            $this->sessionHash = substr(hash_hmac('sha256', $request->session()->getId(), (string) config('app.key')), 0, 16);
+            $this->sessionHash = self::hash($request->session()->getId());
         }
 
         if (config('jot.fields.locale', true)) {
             $this->locale = app()->getLocale();
         }
+    }
+
+    /**
+     * Never the raw ID: whoever reads the logs could take over the session.
+     */
+    public static function hash(string $sessionId): string
+    {
+        return substr(hash_hmac('sha256', $sessionId, (string) config('app.key')), 0, 16);
     }
 }

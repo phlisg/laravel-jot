@@ -499,7 +499,7 @@ With the Sentry SDK for Laravel (`sentry/sentry-laravel`) installed, Jot works w
 
 Sentry has two places for data:
 
-- Sentry issues: one per exception, grouped, with a stack trace. The SDK creates them. Jot tags each one with `trace_id` and `span_id`.
+- Sentry issues: one per exception, grouped, with a stack trace. The SDK creates them. Jot tags each one with `trace_id`, `span_id` and, when the request has a session, `session.hash`.
 - Sentry Logs: log lines, searchable by attribute. With `SENTRY_ENABLE_LOGS=true`, Jot sends each kept event there, with every field as an attribute.
 
 ### During a failure
@@ -509,6 +509,8 @@ Sentry has two places for data:
 3. The issue gets the tags `trace_id` and `span_id`, and a "Jot" context that shows `php artisan jot:query <trace_id>`.
 
 From an issue to its events: run the command shown in the "Jot" context on the server that wrote the logs, see [Debugging an incident](#debugging-an-incident). With a log backend, set `JOT_SENTRY_LINK` to its search URL, for example `https://grafana.example.com/explore?query={trace_id}`. The "Jot" context then shows a link.
+
+From an issue to the visitor's session: run `php artisan jot:query --where=session.hash=<hash>` with the issue's `session.hash` tag. It lists the events of that session that sampling kept. A login regenerates the session ID, so the requests from before the login carry another hash.
 
 From a user report to the issue: take the trace ID from the `X-Request-Id` response header or the error page, then search the Sentry issues for `trace_id:<id>`.
 
