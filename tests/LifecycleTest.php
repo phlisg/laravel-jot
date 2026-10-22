@@ -2,6 +2,8 @@
 
 namespace MarvelousDigital\WideEvents\Tests;
 
+use ArrayObject;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\GenericUser;
@@ -92,6 +94,52 @@ class SendReports extends Command
     {
         throw new RuntimeException('SMTP is down.');
     }
+}
+
+class ProfileUsers implements UserProvider
+{
+    public static int $loads = 0;
+
+    public function retrieveById($identifier): ?Authenticatable
+    {
+        self::$loads++;
+
+        return new GenericUser(['id' => $identifier, 'remember_token' => null]);
+    }
+
+    public function retrieveByToken($identifier, $token): ?Authenticatable
+    {
+        return null;
+    }
+
+    public function updateRememberToken(Authenticatable $user, $token): void {}
+
+    public function retrieveByCredentials(array $credentials): ?Authenticatable
+    {
+        return null;
+    }
+
+    public function validateCredentials(Authenticatable $user, array $credentials): bool
+    {
+        return false;
+    }
+
+    public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): void {}
+}
+
+/**
+ * A second session guard, "profile", with visitor 5 signed in.
+ */
+function signedInToProfile(): array
+{
+    ProfileUsers::$loads = 0;
+    Auth::provider('profiles', fn () => new ProfileUsers);
+    config([
+        'auth.guards.profile' => ['driver' => 'session', 'provider' => 'profiles'],
+        'auth.providers.profiles' => ['driver' => 'profiles'],
+    ]);
+
+    return [Auth::guard('profile')->getName() => 5];
 }
 
 class RememberedUsers implements UserProvider
@@ -234,6 +282,7 @@ describe('http', function () {
             'error.code' => 7,
             'error.retriable' => true,
             'user.id' => 7,
+            'user.guard' => 'web',
             'user.plan' => 'enterprise',
         ]);
     });
@@ -290,6 +339,66 @@ describe('http', function () {
         expect(emittedBy('http'))->toMatchArray(['auth.result' => 'success', 'user.id' => 9]);
     });
 
+    it('records the user of a second guard, with the guard', function () {
+        $session = signedInToProfile();
+        Route::middleware('web')->get('/', fn () => Auth::guard('profile')->id());
+
+        $this->withSession($session)->get('/')->assertSee('5');
+
+        expect(emittedBy('http'))->toMatchArray(['user.id' => 5, 'user.guard' => 'profile']);
+    });
+
+    it('loads no user for a request that never asks for one', function () {
+        $session = signedInToProfile();
+        config(['auth.defaults.guard' => 'profile']);
+        Route::middleware('web')->get('/', fn () => 'ok');
+
+        $this->withSession($session)->get('/')->assertOk();
+
+        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.guard'])
+            ->and(ProfileUsers::$loads)->toBe(0);
+    });
+
+    it('forgets the user after a logout during the request', function () {
+        $session = signedInToProfile();
+        Route::middleware('web')->get('/', fn () => Auth::guard('profile')->logout() ?? 'ok');
+
+        $this->withSession($session)->get('/')->assertOk();
+
+        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.guard']);
+    });
+
+    it('records no user of a second guard with the user group switched off', function () {
+        $session = signedInToProfile();
+        config(['jot.fields.user' => false]);
+        Route::middleware('web')->get('/', fn () => Auth::guard('profile')->id());
+
+        $this->withSession($session)->get('/')->assertSee('5');
+
+        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.guard']);
+    });
+
+    it('passes the user of a second guard to Jot::user()', function () {
+        $session = signedInToProfile();
+        Jot::user(fn ($user) => ['user.plan' => "plan-{$user->getAuthIdentifier()}"]);
+        Route::middleware('web')->get('/', fn () => Auth::guard('profile')->id());
+
+        $this->withSession($session)->get('/');
+
+        expect(emittedBy('http'))->toMatchArray(['user.plan' => 'plan-5']);
+    });
+
+    it('still runs the app\'s own Authenticated listeners', function () {
+        $session = signedInToProfile();
+        $heard = new ArrayObject;
+        Event::listen(Authenticated::class, fn (Authenticated $e) => $heard[] = $e->guard);
+        Route::middleware('web')->get('/', fn () => Auth::guard('profile')->id());
+
+        $this->withSession($session)->get('/');
+
+        expect($heard->getArrayCopy())->toBe(['profile']);
+    });
+
     it('records no error for a 404', function () {
         $this->get('/missing')->assertNotFound();
 
@@ -312,7 +421,7 @@ describe('http', function () {
 
         $this->actingAs(new GenericUser(['id' => 7]))->get('/');
 
-        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.plan']);
+        expect(emittedBy('http'))->not->toHaveKeys(['user.id', 'user.guard', 'user.plan']);
     });
 
     it('counts database queries, cache misses and HTTP client calls', function () {

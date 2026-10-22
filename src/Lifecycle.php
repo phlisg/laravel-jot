@@ -3,8 +3,11 @@
 namespace MarvelousDigital\WideEvents;
 
 use Closure;
+use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\Events\CacheHit;
 use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Console\Events\CommandFinished;
@@ -74,6 +77,20 @@ class Lifecycle
             $events->listen(ScheduledTaskFailed::class, function (ScheduledTaskFailed $e) {
                 jot()->error($e->exception);
                 $this->endTask($e->task);
+            });
+        }
+
+        if (config('jot.fields.user', true)) {
+            // Any guard. The remember-me cookie fires only Login. Block bodies: returning false would stop the app's listeners.
+            $events->listen([Authenticated::class, Login::class], function (Authenticated|Login $e) {
+                $this->section(UserSection::class, function (UserSection $user) use ($e) {
+                    if (config('jot.fields.user', true)) {
+                        $user->authenticated($e->guard, $e->user);
+                    }
+                });
+            });
+            $events->listen([Logout::class, CurrentDeviceLogout::class], function (Logout|CurrentDeviceLogout $e) {
+                $this->section(UserSection::class, fn (UserSection $user) => $user->forget($e->guard));
             });
         }
 

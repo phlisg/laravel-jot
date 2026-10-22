@@ -113,7 +113,7 @@ class Jot
 
         $resolver = app(Writer::class)->user;
 
-        if ($resolver && config('jot.fields.user', true) && $user = $request->user()) {
+        if ($resolver && config('jot.fields.user', true) && $user = $this->builtIn(UserSection::class)?->user()) {
             foreach ($resolver($user) as $field => $value) {
                 $this->appendKey($field, $value, 'Jot::user()');
             }
