@@ -122,6 +122,8 @@ sequenceDiagram
 
 The route is read in `terminate()`: global middleware runs before routing.
 
+The user comes from the `Authenticated` and `Login` events that `Lifecycle` heard on any guard, cleared by `Logout` or `CurrentDeviceLogout` on the same guard. In `terminate()`, a user already held by the default guard replaces it. Jot checks `hasUser()` first: calling `user()` would load the user, and could sign the visitor in from the remember-me cookie after the session is saved.
+
 Error page: with `jot.error_page` on, the service provider appends `resources/views` to `view.paths`. Laravel's `RegisterErrorViewPaths` looks for an error view in `errors/` under each view path in order, then in its own views, so the app's `errors/500.blade.php` comes first and Jot's page replaces only Laravel's default.
 
 ### Queue

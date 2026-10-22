@@ -16,6 +16,7 @@ A wide event holds two kinds of fields: the ones the app adds with `jot()`, and 
 - [Field conventions](#field-conventions)
 - [Automatic fields](#automatic-fields)
   - [Errors](#errors)
+  - [User](#user)
   - [Login example](#login-example)
   - [App fields](#app-fields)
 
@@ -299,7 +300,7 @@ The details:
 | A value and child keys under one name: `order` next to `order.id` | the child keys, the value is dropped | yes |
 | Two section classes with one prefix | they share one slot: adding one replaces the other. `jot(Other::class)` returns the instance already there, `Other::current()` throws `JotSectionPrefixConflict` unless that instance is an `Other` | no |
 
-An automatic field wins only when it has a value. With a user logged in, `jot()->add('user.id', 5)` gives way to that user's ID. With no user, `user.id` stays 5.
+An automatic field wins only when it has a value. With a user loaded during the request, `jot()->add('user.id', 5)` gives way to that user's ID. With no user, `user.id` stays 5.
 
 A value and child keys cannot coexist because the nested output shape turns `order.id` into `{"order": {"id": 9}}`, which leaves no place for a value of `order`, see [Output shapes](outputs.md#output-shapes).
 
@@ -347,8 +348,8 @@ On HTTP requests, by group:
 | `client` | `user_agent.original` (first 256 characters), `client.address` | user agent on, IP anonymized |
 | `query` | `url.query`: the query string with only the keys in `query.allow` | no key allowed |
 | `session` | `session.hash`: a keyed hash of the session ID, to link requests from the same browser session | on |
-| `user` | `user.id`, read at the end of the request so that a login during the request is included | on |
-| `auth` | `auth.result`: `success` or `failed`, only on requests that attempt a login | on |
+| `user` | `user.id`, and `user.guard`: the name of the auth guard, such as `web`. See [User](#user). | on |
+| `auth` | `auth.result`: `success` or `failed`, only on requests that attempt a login. A visitor signed back in by the remember-me cookie gets no `auth.result`. | on |
 | `locale` | `app.locale` | on |
 | `livewire` | `livewire.*` and `filament.action` on Livewire update requests, see [Livewire](livewire.md) | on |
 
@@ -397,12 +398,25 @@ When Laravel reports an exception, Jot adds:
 
 With several exceptions, the other fields describe the last one. How exceptions reach the event: [Errors](../README.md#errors).
 
+### User
+
+`user.id` and `user.guard` hold the user that the app loaded during the request, from any auth guard. For a request to carry `user.id`, the app must check the user in it, for example with the `auth` middleware or `auth()->user()`.
+
+| Source | What Jot records |
+|---|---|
+| Laravel's `Authenticated` or `Login` event, from any guard | that guard and user. `Logout` or `CurrentDeviceLogout` on the same guard clears them. |
+| The default guard, at the end of the request | its user, if the guard already holds one. This user wins over one from an event. |
+
+Jot never loads the user itself. A public page that never checks the user writes no `user.id`, even for a signed-in visitor. In return, Jot adds no SQL query and never signs a visitor in from the remember-me cookie after the response.
+
+Token guards, such as Sanctum tokens, `RequestGuard` or `TokenGuard`, fire no auth events. Jot records their user only when the guard is the default one and the app already loaded the user.
+
 ### Login example
 
 1. An anonymous user posts wrong credentials to `/login`. The event holds `auth.result=failed` and no `user.id`.
 2. The user tries again with the right password. The event holds `auth.result=success` and the new `user.id`.
 
-The login controller adds nothing: Jot listens to Laravel's login events and reads the user at the end of the request.
+The login controller adds nothing: Jot listens to Laravel's login events.
 
 ### App fields
 
@@ -419,4 +433,4 @@ Jot::user(fn (User $user) => [
 ]);
 ```
 
-The callback runs at the end of each request that has an authenticated user, when the `user` group is on.
+The callback runs at the end of each request that has a `user.id`, with the same user, when the `user` group is on. A request where the app never loaded a user skips it, see [User](#user).
