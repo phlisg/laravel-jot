@@ -14,6 +14,8 @@ use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,6 +30,7 @@ use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Queue\Jobs\SyncJob as QueuedJob;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +92,38 @@ class SendReports extends Command
     {
         throw new RuntimeException('SMTP is down.');
     }
+}
+
+class RememberedUsers implements UserProvider
+{
+    public static function user(): GenericUser
+    {
+        return new GenericUser(['id' => 9, 'password' => 'secret', 'remember_token' => 'token']);
+    }
+
+    public function retrieveById($identifier): ?Authenticatable
+    {
+        return null;
+    }
+
+    public function retrieveByToken($identifier, $token): ?Authenticatable
+    {
+        return $token === 'token' ? self::user() : null;
+    }
+
+    public function updateRememberToken(Authenticatable $user, $token): void {}
+
+    public function retrieveByCredentials(array $credentials): ?Authenticatable
+    {
+        return null;
+    }
+
+    public function validateCredentials(Authenticatable $user, array $credentials): bool
+    {
+        return false;
+    }
+
+    public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): void {}
 }
 
 function emitted(): array
@@ -229,6 +264,26 @@ describe('http', function () {
 
             return 'ok';
         });
+
+        $this->post('/login');
+
+        expect(emittedBy('http'))->toMatchArray(['auth.result' => 'success', 'user.id' => 9]);
+    });
+
+    it('writes no login when the remember-me cookie signs the user back in', function () {
+        Auth::provider('remembered', fn () => new RememberedUsers);
+        config(['auth.providers.users.driver' => 'remembered']);
+        Route::middleware('web')->get('/', fn () => auth()->id());
+
+        $this->withCookie(Auth::guard('web')->getRecallerName(), '9|token|secret')->get('/')->assertSee('9');
+
+        expect(emittedBy('http'))->toMatchArray(['user.id' => 9])->not->toHaveKey('auth.result');
+    });
+
+    it('writes a login that asks to be remembered', function () {
+        Auth::provider('remembered', fn () => new RememberedUsers);
+        config(['auth.providers.users.driver' => 'remembered']);
+        Route::middleware('web')->post('/login', fn () => auth()->login(RememberedUsers::user(), remember: true) ?? 'ok');
 
         $this->post('/login');
 
@@ -574,6 +629,16 @@ it('writes a job released for a retry, with its error', function () {
     event(new JobReleasedAfterException('redis', $job, 10));
 
     expect(emittedBy('queue'))->toMatchArray(['job.status' => 'released', 'error.type' => RuntimeException::class]);
+});
+
+it('passes job exceptions on to the app listeners of a job it never started', function () {
+    Event::listen(JobExceptionOccurred::class, function () use (&$heard) {
+        $heard = true;
+    });
+
+    event(new JobExceptionOccurred('redis', workerJob(), new RuntimeException('import broke')));
+
+    expect($heard)->toBeTrue();
 });
 
 it('ignores the events of a job it never started', function () {

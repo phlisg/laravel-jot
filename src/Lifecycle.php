@@ -13,6 +13,7 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
@@ -55,7 +56,10 @@ class Lifecycle
                 $this->top() === $e->job && jot()->error($e->exception);
                 $this->endJob($e->job, 'failed');
             });
-            $events->listen(JobExceptionOccurred::class, fn (JobExceptionOccurred $e) => $this->top() === $e->job && jot()->error($e->exception));
+            // A block body: a listener that returns false stops the app's own listeners.
+            $events->listen(JobExceptionOccurred::class, function (JobExceptionOccurred $e) {
+                $this->top() === $e->job && jot()->error($e->exception);
+            });
             $events->listen(JobReleasedAfterException::class, fn (JobReleasedAfterException $e) => $this->endJob($e->job, 'released'));
         }
 
@@ -74,7 +78,14 @@ class Lifecycle
         }
 
         if (config('jot.fields.auth', true)) {
-            $events->listen(Login::class, fn () => $this->section(UserSection::class, fn (UserSection $user) => $user->authResult = 'success'));
+            $events->listen(Login::class, function (Login $e) {
+                // SessionGuard also fires Login when the remember-me cookie signs a returning visitor back in.
+                $guard = auth()->guard($e->guard);
+
+                if (! ($guard instanceof StatefulGuard && $guard->viaRemember())) {
+                    $this->section(UserSection::class, fn (UserSection $user) => $user->authResult = 'success');
+                }
+            });
             $events->listen(Failed::class, fn () => $this->section(UserSection::class, fn (UserSection $user) => $user->authResult = 'failed'));
         }
 
