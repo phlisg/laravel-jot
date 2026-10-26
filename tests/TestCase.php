@@ -3,8 +3,8 @@
 namespace Phlisg\WideEvents\Tests;
 
 use Livewire\LivewireServiceProvider;
-use Phlisg\WideEvents\JotServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Phlisg\WideEvents\JotServiceProvider;
 
 class TestCase extends Orchestra
 {

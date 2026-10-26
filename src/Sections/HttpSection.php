@@ -3,11 +3,11 @@
 namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Http\Request;
-use Phlisg\WideEvents\Attributes\Key;
-use Phlisg\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\HttpAttributes;
 use OpenTelemetry\SemConv\Attributes\UrlAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\HttpIncubatingAttributes;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 use Symfony\Component\HttpFoundation\Response;
 
 /**

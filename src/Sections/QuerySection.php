@@ -5,9 +5,9 @@ namespace Phlisg\WideEvents\Sections;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use OpenTelemetry\SemConv\Attributes\UrlAttributes;
 use Phlisg\WideEvents\Attributes\Key;
 use Phlisg\WideEvents\Section;
-use OpenTelemetry\SemConv\Attributes\UrlAttributes;
 
 /**
  * The query string, with only the keys listed in jot.fields.query.allow.

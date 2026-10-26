@@ -3,10 +3,10 @@
 namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Http\Request;
-use Phlisg\WideEvents\Attributes\Key;
-use Phlisg\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ClientAttributes;
 use OpenTelemetry\SemConv\Attributes\UserAgentAttributes;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final class ClientSection extends Section

@@ -2,12 +2,12 @@
 
 namespace Phlisg\WideEvents\Sections;
 
-use Phlisg\WideEvents\Attributes\Key;
-use Phlisg\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ServiceAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\DeploymentIncubatingAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\HostIncubatingAttributes;
 use OpenTelemetry\SemConv\Incubating\Attributes\ProcessIncubatingAttributes;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 
 final class AppSection extends Section
 {

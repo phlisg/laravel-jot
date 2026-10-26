@@ -3,9 +3,9 @@
 namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Http\Request;
+use OpenTelemetry\SemConv\Incubating\Attributes\UserIncubatingAttributes;
 use Phlisg\WideEvents\Attributes\Key;
 use Phlisg\WideEvents\Section;
-use OpenTelemetry\SemConv\Incubating\Attributes\UserIncubatingAttributes;
 
 /**
  * Read at the end of the request, so a login during the request is included.

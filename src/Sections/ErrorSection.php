@@ -3,12 +3,12 @@
 namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Support\Str;
+use OpenTelemetry\SemConv\Attributes\ErrorAttributes;
+use OpenTelemetry\SemConv\Attributes\ExceptionAttributes;
 use Phlisg\WideEvents\Attributes\Hide;
 use Phlisg\WideEvents\Attributes\Key;
 use Phlisg\WideEvents\Contracts\Retriable;
 use Phlisg\WideEvents\Section;
-use OpenTelemetry\SemConv\Attributes\ErrorAttributes;
-use OpenTelemetry\SemConv\Attributes\ExceptionAttributes;
 use Throwable;
 
 final class ErrorSection extends Section
