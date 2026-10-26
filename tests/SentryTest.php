@@ -1,11 +1,11 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Illuminate\Support\Facades\Route;
-use MarvelousDigital\WideEvents\Enums\OutputShape;
-use MarvelousDigital\WideEvents\Facades\Jot;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Writer;
 use Sentry\ClientBuilder;
 use Sentry\Event;
 use Sentry\Laravel\ServiceProvider as SentryServiceProvider;

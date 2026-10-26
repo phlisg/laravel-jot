@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -35,10 +35,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use LogicException;
-use MarvelousDigital\WideEvents\Contracts\Retriable;
-use MarvelousDigital\WideEvents\Enums\OutputShape;
-use MarvelousDigital\WideEvents\Facades\Jot;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Contracts\Retriable;
+use Phlisg\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Writer;
 use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;

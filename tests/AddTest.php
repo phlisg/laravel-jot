@@ -1,15 +1,15 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use MarvelousDigital\WideEvents\Enums\OutputShape;
-use MarvelousDigital\WideEvents\Facades\Jot as JotFacade;
-use MarvelousDigital\WideEvents\Jot;
-use MarvelousDigital\WideEvents\Section;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Facades\Jot as JotFacade;
+use Phlisg\WideEvents\Jot;
+use Phlisg\WideEvents\Section;
+use Phlisg\WideEvents\Writer;
 
 enum Field: string
 {

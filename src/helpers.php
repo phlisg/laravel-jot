@@ -1,7 +1,7 @@
 <?php
 
-use MarvelousDigital\WideEvents\Jot;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Jot;
+use Phlisg\WideEvents\Section;
 
 if (! function_exists('jot')) {
     function jot(Section|string|null $section = null): Jot|Section

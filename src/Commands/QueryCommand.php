@@ -1,15 +1,15 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands;
+namespace Phlisg\WideEvents\Commands;
 
 use Closure;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Prompts\Key;
-use MarvelousDigital\WideEvents\Commands\Concerns\ReadsEvents;
-use MarvelousDigital\WideEvents\Commands\Table\EventTable;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Commands\Concerns\ReadsEvents;
+use Phlisg\WideEvents\Commands\Table\EventTable;
+use Phlisg\WideEvents\Writer;
 use Psr\Log\LogLevel;
 use Symfony\Component\Console\Attribute\AsCommand;
 

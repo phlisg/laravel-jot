@@ -1,10 +1,10 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Http\Request;
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ClientAttributes;
 use OpenTelemetry\SemConv\Attributes\UserAgentAttributes;
 use Symfony\Component\HttpFoundation\IpUtils;

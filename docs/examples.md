@@ -20,7 +20,7 @@ Jot adds the rest, such as `trace_id`, `http.route`, `user.id` and `session.hash
    ```php
    namespace App\Jot;
 
-   use MarvelousDigital\WideEvents\Section;
+   use Phlisg\WideEvents\Section;
 
    final class PaymentLog extends Section
    {

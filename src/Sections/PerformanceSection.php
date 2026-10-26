@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 
 /**
  * Counters filled by the listeners in Lifecycle. A null counter is switched off.

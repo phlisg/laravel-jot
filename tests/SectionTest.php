@@ -1,15 +1,15 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Illuminate\Http\Request;
 use InvalidArgumentException;
-use MarvelousDigital\WideEvents\Attributes\Hide;
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Exceptions\JotSectionPrefixConflict;
-use MarvelousDigital\WideEvents\Exceptions\JotSectionRequiresInitialisation;
-use MarvelousDigital\WideEvents\Facades\Jot;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Hide;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Exceptions\JotSectionPrefixConflict;
+use Phlisg\WideEvents\Exceptions\JotSectionRequiresInitialisation;
+use Phlisg\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Section;
 
 class MySection extends Section {}
 

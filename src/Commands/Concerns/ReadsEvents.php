@@ -1,10 +1,10 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands\Concerns;
+namespace Phlisg\WideEvents\Commands\Concerns;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Writer;
 use Symfony\Component\Console\Output\StreamOutput;
 
 use function Laravel\Prompts\select;

@@ -2,7 +2,7 @@
 
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
-use MarvelousDigital\WideEvents\Tests\TestCase;
+use Phlisg\WideEvents\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
 

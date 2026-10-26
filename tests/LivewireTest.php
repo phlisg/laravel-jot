@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Composer\InstalledVersions;
 use Illuminate\Support\Facades\Blade;
@@ -9,8 +9,8 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
-use MarvelousDigital\WideEvents\Facades\Jot;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Writer;
 
 class CheckoutForm extends Component
 {

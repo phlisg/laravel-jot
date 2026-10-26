@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Contracts\Queue\Job;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Section;
 
 final class JobSection extends Section
 {

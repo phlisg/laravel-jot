@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Attributes;
+namespace Phlisg\WideEvents\Attributes;
 
 use Attribute;
 
