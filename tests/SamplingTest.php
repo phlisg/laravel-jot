@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Cache;
-use MarvelousDigital\WideEvents\Facades\Jot;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Writer;
 use Psr\Log\LogLevel;
 
 function keeps(array $event): bool

@@ -1,11 +1,11 @@
 <?php
 
-namespace MarvelousDigital\WideEvents;
+namespace Phlisg\WideEvents;
 
 use BackedEnum;
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Attributes\Hide;
-use MarvelousDigital\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Attributes\Hide;
+use Phlisg\WideEvents\Attributes\Key;
 use ReflectionObject;
 use ReflectionProperty;
 

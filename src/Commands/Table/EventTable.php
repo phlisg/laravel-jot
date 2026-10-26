@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands\Table;
+namespace Phlisg\WideEvents\Commands\Table;
 
 use Laravel\Prompts\DataTablePrompt;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Writer;
 use Psr\Log\LogLevel;
 
 /**

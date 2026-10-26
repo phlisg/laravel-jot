@@ -1,10 +1,10 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands;
+namespace Phlisg\WideEvents\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Writer;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'jot:disk')]

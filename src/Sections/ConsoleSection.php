@@ -1,8 +1,8 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Section;
 
 /**
  * Argument and option names only, never their values: values can carry secrets.

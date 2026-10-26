@@ -1,12 +1,12 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Attributes\Hide;
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Contracts\Retriable;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Hide;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Contracts\Retriable;
+use Phlisg\WideEvents\Section;
 use OpenTelemetry\SemConv\Attributes\ErrorAttributes;
 use OpenTelemetry\SemConv\Attributes\ExceptionAttributes;
 use Throwable;

@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands\Table;
+namespace Phlisg\WideEvents\Commands\Table;
 
 use Laravel\Prompts\DataTablePrompt;
 use Laravel\Prompts\Themes\Default\DataTableRenderer;

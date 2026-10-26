@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Livewire\LivewireServiceProvider;
-use MarvelousDigital\WideEvents\JotServiceProvider;
+use Phlisg\WideEvents\JotServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra

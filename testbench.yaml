@@ -2,7 +2,7 @@ laravel: '@testbench'
 
 providers:
   - Livewire\LivewireServiceProvider
-  - MarvelousDigital\WideEvents\JotServiceProvider
+  - Phlisg\WideEvents\JotServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 
 migrations: true

@@ -275,7 +275,7 @@ Other methods (`addIfMissing`, `increment`, `push`), the `Jot` facade, enum keys
 A section groups related fields under one key prefix. `php artisan jot:section PaymentLog` creates one in `app/Jot`:
 
 ```php
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Section;
 
 final class PaymentLog extends Section
 {
@@ -446,7 +446,7 @@ Find the noise first, then drop it with the same pattern:
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use MarvelousDigital\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Facades\Jot;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -556,7 +556,7 @@ An IP address is personal data under the GDPR (General Data Protection Regulatio
 `Jot::fake()` records events instead of writing them. Sampling still applies.
 
 ```php
-use MarvelousDigital\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Facades\Jot;
 
 Jot::fake();
 

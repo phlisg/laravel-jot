@@ -1,13 +1,13 @@
 <?php
 
-namespace MarvelousDigital\WideEvents;
+namespace Phlisg\WideEvents;
 
 use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
-use MarvelousDigital\WideEvents\Sections\LivewireSection;
+use Phlisg\WideEvents\Sections\LivewireSection;
 
 /**
  * Fills the Livewire section of a Livewire update request from Livewire's hooks.

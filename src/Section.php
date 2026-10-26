@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents;
+namespace Phlisg\WideEvents;
 
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Exceptions\JotSectionPrefixConflict;
+use Phlisg\WideEvents\Exceptions\JotSectionPrefixConflict;
 
 abstract class Section
 {

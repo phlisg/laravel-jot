@@ -1,6 +1,6 @@
 <?php
 
-use MarvelousDigital\WideEvents\Commands\EnvCommand;
+use Phlisg\WideEvents\Commands\EnvCommand;
 
 beforeEach(function () {
     $this->files = [base_path('.env.example'), base_path('.env')];

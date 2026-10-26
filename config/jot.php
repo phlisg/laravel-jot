@@ -1,6 +1,6 @@
 <?php
 
-use MarvelousDigital\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Enums\OutputShape;
 
 // Local and test runs keep every event the drop rules leave; other environments keep what helps debug an incident.
 $local = in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);

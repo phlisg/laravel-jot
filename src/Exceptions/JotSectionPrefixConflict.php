@@ -1,9 +1,9 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Exceptions;
+namespace Phlisg\WideEvents\Exceptions;
 
 use LogicException;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Section;
 
 class JotSectionPrefixConflict extends LogicException
 {

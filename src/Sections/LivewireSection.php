@@ -1,10 +1,10 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
 use LogicException;
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 
 /**
  * What a Livewire update request did. Names and paths only, never values.

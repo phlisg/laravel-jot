@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Tests;
+namespace Phlisg\WideEvents\Tests;
 
 use Closure;
 use Illuminate\Contracts\Console\Kernel;
@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Prompts\Key;
 use Laravel\Prompts\Prompt;
 use LogicException;
-use MarvelousDigital\WideEvents\Commands\QueryCommand;
-use MarvelousDigital\WideEvents\Commands\Table\EventTable;
-use MarvelousDigital\WideEvents\Commands\Table\EventTableRenderer;
-use MarvelousDigital\WideEvents\Enums\OutputShape;
-use MarvelousDigital\WideEvents\Writer;
+use Phlisg\WideEvents\Commands\QueryCommand;
+use Phlisg\WideEvents\Commands\Table\EventTable;
+use Phlisg\WideEvents\Commands\Table\EventTableRenderer;
+use Phlisg\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Writer;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Workbench\App\Jobs\ChargeCard;

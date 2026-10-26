@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Enums;
+namespace Phlisg\WideEvents\Enums;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;

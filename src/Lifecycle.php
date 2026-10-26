@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents;
+namespace Phlisg\WideEvents;
 
 use Closure;
 use Illuminate\Auth\Events\Failed;
@@ -27,12 +27,12 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Sections\ConsoleSection;
-use MarvelousDigital\WideEvents\Sections\JobSection;
-use MarvelousDigital\WideEvents\Sections\PerformanceSection;
-use MarvelousDigital\WideEvents\Sections\RequestSection;
-use MarvelousDigital\WideEvents\Sections\ScheduleSection;
-use MarvelousDigital\WideEvents\Sections\UserSection;
+use Phlisg\WideEvents\Sections\ConsoleSection;
+use Phlisg\WideEvents\Sections\JobSection;
+use Phlisg\WideEvents\Sections\PerformanceSection;
+use Phlisg\WideEvents\Sections\RequestSection;
+use Phlisg\WideEvents\Sections\ScheduleSection;
+use Phlisg\WideEvents\Sections\UserSection;
 use Symfony\Component\Console\Input\InputInterface;
 
 /**

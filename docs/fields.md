@@ -66,7 +66,7 @@ The event gets:
 The `Jot` facade exposes the same methods. Use it when the app already has its own `jot()` function, or in service providers and tests:
 
 ```php
-use MarvelousDigital\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Facades\Jot;
 
 Jot::add('payment.provider', 'stripe');
 ```
@@ -119,7 +119,7 @@ String keys cost nothing to add, so they spread. Each one is a field name that l
 A section is a class that groups related fields under one key prefix, for example `payment`. It extends `MarvelousDigital\WideEvents\Section`, and its typed public properties are the fields. `php artisan jot:section PaymentLog` creates an empty one in `app/Jot`.
 
 ```php
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Section;
 
 final class PaymentLog extends Section
 {
@@ -221,8 +221,8 @@ Two attributes change the rules for one property:
 
 ```php
 use OpenTelemetry\SemConv\Attributes\UrlAttributes;
-use MarvelousDigital\WideEvents\Attributes\Hide;
-use MarvelousDigital\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Attributes\Hide;
+use Phlisg\WideEvents\Attributes\Key;
 
 final class CheckoutLog extends Section
 {
@@ -270,7 +270,7 @@ A Pest architecture test keeps `app/Jot` consistent:
 ```php
 arch('jot sections')
     ->expect('App\Jot')
-    ->toExtend(MarvelousDigital\WideEvents\Section::class);
+    ->toExtend(Phlisg\WideEvents\Section::class);
 ```
 
 ## Key collisions
@@ -409,7 +409,7 @@ The login controller adds nothing: Jot listens to Laravel's login events and rea
 Some user fields depend on the app's data model: subscription tier, team, role, organization, account age, A/B test cohort. Declare them once, in a service provider:
 
 ```php
-use MarvelousDigital\WideEvents\Facades\Jot;
+use Phlisg\WideEvents\Facades\Jot;
 
 Jot::user(fn (User $user) => [
     'user.plan' => $user->plan,

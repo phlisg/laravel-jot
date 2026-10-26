@@ -1,13 +1,13 @@
 <?php
 
-namespace MarvelousDigital\WideEvents;
+namespace Phlisg\WideEvents;
 
 use Closure;
 use Illuminate\Log\Logger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Enums\OutputShape;
+use Phlisg\WideEvents\Enums\OutputShape;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;

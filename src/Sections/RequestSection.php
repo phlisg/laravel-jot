@@ -1,11 +1,11 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Sections;
+namespace Phlisg\WideEvents\Sections;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
-use MarvelousDigital\WideEvents\Attributes\Key;
-use MarvelousDigital\WideEvents\Section;
+use Phlisg\WideEvents\Attributes\Key;
+use Phlisg\WideEvents\Section;
 
 /**
  * Always on: the W3C Trace Context IDs that link one event to the others in its trace.

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
-use MarvelousDigital\WideEvents\Jot;
+use Phlisg\WideEvents\Jot;
 use Symfony\Component\HttpFoundation\Response;
 
 class DemoCommand extends Command

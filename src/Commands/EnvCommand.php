@@ -1,6 +1,6 @@
 <?php
 
-namespace MarvelousDigital\WideEvents\Commands;
+namespace Phlisg\WideEvents\Commands;
 
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
