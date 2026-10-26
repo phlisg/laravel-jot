@@ -1,12 +1,12 @@
 {
-    "name": "marvelous-digital/laravel-wide-events",
+    "name": "phlisg/laravel-jot",
     "description": "One structured log event per request and per queued job, with a typed schema.",
     "keywords": [
         "marvelous-digital",
         "laravel",
         "laravel-wide-events"
     ],
-    "homepage": "https://github.com/Marvelous-Digital/laravel-wide-events",
+    "homepage": "https://github.com/phlisg/laravel-jot",
     "license": "MIT",
     "authors": [
         {

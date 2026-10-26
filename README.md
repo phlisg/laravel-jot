@@ -138,12 +138,12 @@ The package lives in a private GitHub repository and is not on Packagist. To ins
 2. Add the repository to `composer.json`:
    ```json
    "repositories": [
-       { "type": "vcs", "url": "https://github.com/Marvelous-Digital/laravel-wide-events" }
+       { "type": "vcs", "url": "https://github.com/phlisg/laravel-jot" }
    ]
    ```
 3. Install:
    ```sh
-   composer require marvelous-digital/laravel-wide-events
+   composer require phlisg/laravel-jot
    ```
 4. Check it works: load a page of the app, then run:
    ```sh
@@ -580,7 +580,7 @@ Jot::assertEmitted(fn (array $event) => $event['payment.status'] === 'declined')
 
 The package follows semantic versioning and starts at `0.x`. Until `1.0.0`, a minor release (`0.2` to `0.3`) can contain breaking changes. Patch releases (`0.3.0` to `0.3.1`) never do.
 
-- Composer's caret constraint on a `0.x` version stays within one minor release: `composer require marvelous-digital/laravel-wide-events:^0.3` installs `0.3.*` only.
+- Composer's caret constraint on a `0.x` version stays within one minor release: `composer require phlisg/laravel-jot:^0.3` installs `0.3.*` only.
 - `CHANGELOG.md` lists the breaking changes of each minor release.
 
 `1.0.0` comes once the public API (`jot()`, the `Jot` facade, `Section`, `config/jot.php`) is stable.

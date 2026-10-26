@@ -9,7 +9,7 @@ jobs:
   dependabot:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'Marvelous-Digital/laravel-wide-events' }}
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'phlisg/laravel-jot' }}
     steps:
 
       - name: Dependabot metadata

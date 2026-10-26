@@ -251,5 +251,5 @@ Other types, such as `build:`, `test:` or `style:`, stay out of the notes. A com
 
 Set up the token and the repository as in [Installation](../README.md#installation). Then:
 
-- A release: `composer require marvelous-digital/laravel-wide-events:^0.3`
-- Unreleased work on `develop`: `composer require marvelous-digital/laravel-wide-events:dev-develop`
+- A release: `composer require phlisg/laravel-jot:^0.3`
+- Unreleased work on `develop`: `composer require phlisg/laravel-jot:dev-develop`
